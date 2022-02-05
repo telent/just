@@ -31,6 +31,9 @@
                                 })
       back (Gtk.Button {
                         :label "<-"
+                        :on_clicked (fn [s]
+                                      (if (webview:can_go_back)
+                                          (webview:go_back)))
                         })]
 
 
