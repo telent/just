@@ -18,14 +18,8 @@ let fennel = fetchurl {
       hash = "sha256:1nha32yilzagfwrs44hc763jgwxd700kaik1is7x7lsjjvkgapw7";
     };
     webkitgtk = gnome3.webkitgtk;
-    # dbusProxy = callPackage ./dbus-proxy.nix {
-    #   inherit (lua53Packages) lgi buildLuaPackage;
-    #   lua = lua5_3;
-    # };
 
     lua = lua5_3.withPackages (ps: with ps; [
-#      dbusProxy
-#      inifile
       inspect
       lgi
       luafilesystem
