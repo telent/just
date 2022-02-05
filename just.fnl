@@ -9,6 +9,11 @@
 (local content-filter-store
        (WebKit2.UserContentFilterStore {:path cache-dir}))
 
+(fn named-image [name size]
+  (Gtk.Image.new_from_icon_name
+   name
+   (or size Gtk.IconSize.LARGE_TOOLBAR)))
+
 (fn load-easylist-json [store cb]
   (print "loading easylist from json")
   (with-open [f (io.open "easylist_min_content_blocker.json" "r")]
@@ -68,9 +73,7 @@
                                           (if (webview:can_go_back)
                                               (webview:go_back)))
                             })
-             (: :set_image
-                (Gtk.Image.new_from_icon_name "go-previous"  Gtk.IconSize.LARGE_TOOLBAR)))]
-
+             (: :set_image (named-image "go-previous")))]
   (load-adblocks webview.user_content_manager content-filter-store)
 
   (tset url :on_activate (fn [self]
