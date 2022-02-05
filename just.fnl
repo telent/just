@@ -40,6 +40,20 @@
             (fn [filter]
               (content-manager:add_filter filter))))))))
 
+(let [css "
+progress, trough {
+  max-height: 6px;
+  color: #4444bb;
+}
+"
+      style_provider (Gtk.CssProvider)]
+  (style_provider:load_from_data css)
+  (Gtk.StyleContext.add_provider_for_screen
+   (lgi.Gdk.Screen.get_default)
+   style_provider
+   Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+   ))
+
 
 (let [current-url "https://terse.telent.net/admin/stream"
       r {}
@@ -55,6 +69,11 @@
       nav-bar (Gtk.Box {
                         :orientation Gtk.Orientation.HORIZONTAL
                         })
+      progress-bar (Gtk.ProgressBar {
+                                     :orientation Gtk.Orientation.HORIZONTAL
+                                     :fraction 1.0
+                                     :margin 0
+                                     })
       url (doto (Gtk.Entry {
                             :on_activate
                             (fn [self]
@@ -78,6 +97,11 @@
                                            (> (# self.title) 0))
                                       (window:set_title
                                        (.. self.title " - Just browsing"))
+
+                                      (= pspec.name
+                                         "estimated-load-progress")
+                                      (tset progress-bar :fraction
+                                            self.estimated_load_progress)
 
                                       (= pspec.name "is-loading")
                                       (stop-refresh:set_image
@@ -103,6 +127,7 @@
   (nav-bar:pack_end stop-refresh false false 2)
 
   (container:pack_start nav-bar false false 5)
+  (container:pack_start progress-bar false false 0)
   (container:pack_start webview true true 5)
 
   (webview:load_uri current-url)
