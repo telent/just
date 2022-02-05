@@ -42,6 +42,7 @@
 
 
 (let [current-url "https://terse.telent.net/admin/stream"
+      r {}
       window (Gtk.Window {
                           :title "Just browsing"
                           :default_width 800
@@ -54,7 +55,11 @@
       nav-bar (Gtk.Box {
                         :orientation Gtk.Orientation.HORIZONTAL
                         })
-      url (doto (Gtk.Entry)
+      url (doto (Gtk.Entry {
+                            :on_activate
+                            (fn [self]
+                              (r.webview:load_uri self.text))
+                            })
             (: :set_text current-url))
       webview (WebKit2.WebView {
                                 :on_notify
@@ -74,10 +79,8 @@
                                               (webview:go_back)))
                             })
              (: :set_image (named-image "go-previous")))]
+  (tset r :webview webview)
   (load-adblocks webview.user_content_manager content-filter-store)
-
-  (tset url :on_activate (fn [self]
-                           (webview:load_uri self.text)))
 
   (nav-bar:pack_start back false false 2)
   (nav-bar:pack_start url  true true 2)
