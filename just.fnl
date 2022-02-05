@@ -4,7 +4,39 @@
 (local Gtk lgi.Gtk)
 (local WebKit2 lgi.WebKit2)
 
-(let [current-url "https://terse.telent.net"
+(local cache-dir (.. (os.getenv "HOME") "/.cache"))
+
+(local content-filter-store
+       (WebKit2.UserContentFilterStore {:path cache-dir}))
+
+(fn load-easylist-json [store cb]
+  (print "loading easylist from json")
+  (with-open [f (io.open "easylist_min_content_blocker.json" "r")]
+             (let [blocks (f:read "*a")]
+               (store:save "easylist"
+                           (lgi.GLib.Bytes blocks)
+                           nil
+                           (fn [self res]
+                             (cb (store:save_finish res)))))))
+
+(fn load-adblocks [content-manager store]
+  (store:fetch_identifiers
+   nil
+   (fn [self res]
+     (let [ids (store:fetch_identifiers_finish res)
+           found (icollect [_ id (pairs ids)] (= id "easylist"))]
+       (if (> (# found) 0)
+           (store:load "easylist" nil
+                       (fn [self res]
+                         (content-manager:add_filter
+                          (store:load_finish res))))
+           (load-easylist-json
+            store
+            (fn [filter]
+              (content-manager:add_filter filter))))))))
+
+
+(let [current-url "https://terse.telent.net/admin/stream"
       window (Gtk.Window {
                           :title "Just browsing"
                           :default_width 800
@@ -38,6 +70,8 @@
                             })
              (: :set_image
                 (Gtk.Image.new_from_icon_name "go-previous"  Gtk.IconSize.LARGE_TOOLBAR)))]
+
+  (load-adblocks webview.user_content_manager content-filter-store)
 
   (tset url :on_activate (fn [self]
                            (webview:load_uri self.text)))

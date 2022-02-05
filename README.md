@@ -4,7 +4,6 @@ Touchscreen-friendly wrapper around Webkit
 
 ## TO DO
 
-- adblocking
 - downloads (pass to download manager)
 - cancel/stop button
 - refresh button
