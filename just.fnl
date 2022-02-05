@@ -61,15 +61,31 @@
                               (r.webview:load_uri self.text))
                             })
             (: :set_text current-url))
+      stop-refresh (Gtk.Button {
+                                :on_clicked
+                                (fn [s]
+                                  (if r.webview.is_loading
+                                      (r.webview:stop_loading)
+                                      (r.webview:reload)))
+                                })
       webview (WebKit2.WebView {
                                 :on_notify
                                 (fn [self pspec c]
                                   (if (= pspec.name "uri")
                                       (url:set_text self.uri)
+
                                       (and (= pspec.name "title")
                                            (> (# self.title) 0))
                                       (window:set_title
                                        (.. self.title " - Just browsing"))
+
+                                      (= pspec.name "is-loading")
+                                      (stop-refresh:set_image
+                                       (named-image
+                                        (if self.is_loading
+                                            "process-stop"
+                                            "view-refresh")))
+
                                       ))
                                 })
       back (doto
@@ -84,6 +100,7 @@
 
   (nav-bar:pack_start back false false 2)
   (nav-bar:pack_start url  true true 2)
+  (nav-bar:pack_end stop-refresh false false 2)
 
   (container:pack_start nav-bar false false 5)
   (container:pack_start webview true true 5)
