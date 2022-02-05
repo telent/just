@@ -29,16 +29,18 @@
                                        (.. self.title " - Just browsing"))
                                       ))
                                 })
-      back (Gtk.Button {
-                        :label "<-"
-                        :on_clicked (fn [s]
-                                      (if (webview:can_go_back)
-                                          (webview:go_back)))
-                        })]
+      back (doto
+               (Gtk.Button {
+;;                            :label "<-"
+                            :on_clicked (fn [s]
+                                          (if (webview:can_go_back)
+                                              (webview:go_back)))
+                            })
+             (: :set_image
+                (Gtk.Image.new_from_icon_name "go-previous"  Gtk.IconSize.LARGE_TOOLBAR)))]
 
-
-  (nav-bar:pack_start back false false 5)
-  (nav-bar:pack_start url  true true 5)
+  (nav-bar:pack_start back false false 2)
+  (nav-bar:pack_start url  true true 2)
 
   (container:pack_start nav-bar false false 5)
   (container:pack_start webview true true 5)
