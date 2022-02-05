@@ -17,7 +17,8 @@
       nav-bar (Gtk.Box {
                         :orientation Gtk.Orientation.HORIZONTAL
                         })
-      url (doto (Gtk.Entry) (: :set_text current-url))
+      url (doto (Gtk.Entry)
+            (: :set_text current-url))
       webview (WebKit2.WebView {
                                 :on_notify
                                 (fn [self pspec c]
@@ -31,13 +32,15 @@
                                 })
       back (doto
                (Gtk.Button {
-;;                            :label "<-"
                             :on_clicked (fn [s]
                                           (if (webview:can_go_back)
                                               (webview:go_back)))
                             })
              (: :set_image
                 (Gtk.Image.new_from_icon_name "go-previous"  Gtk.IconSize.LARGE_TOOLBAR)))]
+
+  (tset url :on_activate (fn [self]
+                           (webview:load_uri self.text)))
 
   (nav-bar:pack_start back false false 2)
   (nav-bar:pack_start url  true true 2)

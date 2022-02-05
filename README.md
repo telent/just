@@ -11,5 +11,4 @@ Touchscreen-friendly wrapper around Webkit
 - support multiple tabs
 - find out if it's going to eat cpu like luakit does
 - some kind of bookmarks/favourites/pinned tabs
-- fetch url when typed in
 - ESC in url bar cancels typing
