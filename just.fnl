@@ -23,6 +23,10 @@
                                 (fn [self pspec c]
                                   (if (= pspec.name "uri")
                                       (url:set_text self.uri)
+                                      (and (= pspec.name "title")
+                                           (> (# self.title) 0))
+                                      (window:set_title
+                                       (.. self.title " - Just browsing"))
                                       ))
                                 })
       back (Gtk.Button {
