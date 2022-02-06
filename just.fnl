@@ -9,6 +9,23 @@
 (local content-filter-store
        (WebKit2.UserContentFilterStore {:path cache-dir}))
 
+(fn event-bus []
+  (let [subscriptions {}
+        vivify (fn [n v]
+                 (or (. n v)
+                     (do (tset n v {}) (. n v))))]
+    {
+     :subscriptions subscriptions
+     :subscribe (fn [self event-name handler]
+                  (table.insert (vivify subscriptions event-name) handler))
+     :publish (fn [self event-name payload]
+                (each [_ handler (pairs (. subscriptions event-name))]
+                  (handler payload)))
+     :unsubscribe (fn [self event-name handler]
+                    (table.remove (. subscriptions event-name) handler))
+     }))
+
+
 (fn named-image [name size]
   (Gtk.Image.new_from_icon_name
    name
@@ -56,6 +73,7 @@ progress, trough {
 
 
 (let [current-url "https://terse.telent.net/admin/stream"
+      bus (event-bus)
       r {}
       window (Gtk.Window {
                           :title "Just browsing"
@@ -77,39 +95,39 @@ progress, trough {
       url (doto (Gtk.Entry {
                             :on_activate
                             (fn [self]
-                              (r.webview:load_uri self.text))
+                              (bus:publish :fetch self.text))
                             })
             (: :set_text current-url))
       stop-refresh (Gtk.Button {
                                 :on_clicked
                                 (fn [s]
-                                  (if r.webview.is_loading
-                                      (r.webview:stop_loading)
-                                      (r.webview:reload)))
+                                  (bus:publish
+                                   (if r.webview.is_loading
+                                       :stop-loading
+                                       :reload)))
                                 })
       webview (WebKit2.WebView {
                                 :on_notify
                                 (fn [self pspec c]
                                   (if (= pspec.name "uri")
-                                      (url:set_text self.uri)
+                                      (bus:publish
+                                       :url-changed self.uri)
 
                                       (and (= pspec.name "title")
                                            (> (# self.title) 0))
-                                      (window:set_title
-                                       (.. self.title " - Just browsing"))
+                                      (bus:publish
+                                       :title-changed
+                                       self.title)
 
                                       (= pspec.name
                                          "estimated-load-progress")
-                                      (tset progress-bar :fraction
-                                            self.estimated_load_progress)
+                                      (bus:publish
+                                       :loading-progress
+                                       self.estimated_load_progress)
 
                                       (= pspec.name "is-loading")
-                                      (stop-refresh:set_image
-                                       (named-image
-                                        (if self.is_loading
-                                            "process-stop"
-                                            "view-refresh")))
-
+                                      (bus:publish
+                                       :loading? self.is_loading)
                                       ))
                                 })
       back (doto
@@ -119,6 +137,22 @@ progress, trough {
                                               (webview:go_back)))
                             })
              (: :set_image (named-image "go-previous")))]
+
+  (bus:subscribe :fetch #(webview:load_uri $1))
+  (bus:subscribe :stop-loading #(webview:stop_loading))
+  (bus:subscribe :reload #(webview:reload))
+  (bus:subscribe :url-changed #(url:set_text $1))
+
+  (bus:subscribe :url-changed #(print (.. "visiting " $1)))
+  (bus:subscribe :title-changed #(window:set_title
+                                  (.. $1 " - Just browsing")))
+
+  (bus:subscribe :loading-progress #(tset progress-bar :fraction $1))
+  (bus:subscribe :loading?
+                 #(stop-refresh:set_image
+                   (named-image
+                    (if $1 "process-stop" "view-refresh"))))
+
   (tset r :webview webview)
   (load-adblocks webview.user_content_manager content-filter-store)
 
