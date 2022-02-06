@@ -99,15 +99,39 @@ progress, trough {
   (let [webview (WebKit2.WebView {
                                   :on_notify
                                   #(handle-webview-properties $1 $2 bus)
-                                  })]
-    (bus:subscribe :fetch #(webview:load_uri $1))
-    (bus:subscribe :stop-loading #(webview:stop_loading))
-    (bus:subscribe :reload #(webview:reload))
-    (bus:subscribe :go-back #(if (webview:can_go_back)
-                                 (webview:go_back)))
 
+                                  })]
     (load-adblocks webview.user_content_manager content-filter-store)
     webview))
+
+(fn pane-cave [bus]
+  (let [widget (Gtk.Notebook { :show_tabs false })
+        tabs {}
+        new-tab (fn []
+                  (print "new tab")
+                  (let [v (new-webview bus)
+                        i (widget:append_page v)]
+                    (tset tabs i v)
+                    (v:show)
+                    v))
+        current #(. tabs widget.page)]
+    (bus:subscribe :fetch  #(match (current) c (c:load_uri $1)))
+    (bus:subscribe :stop-loading
+                   #(match (current) c (c:stop_loading)))
+    (bus:subscribe :reload
+                   #(match (current) c (c:reload)))
+    (bus:subscribe :go-back
+                   #(match (current) c (and (c:can_go_back) (c:go_back))))
+    (bus:subscribe :new-tab new-tab)
+    {
+     :new-tab new-tab
+     :current-tab current
+     :widget widget
+     :next-tab (fn [self]
+                 (let [n (+ 1 widget.page)]
+                   (widget:set_current_page (if (. tabs n) n 0)))
+                 (widget:get_current_page))
+     }))
 
 (let [current-url "https://terse.telent.net"
       bus (event-bus)
@@ -136,14 +160,20 @@ progress, trough {
                              :on_clicked #(bus:publish :stop-loading)
                              })
                 (: :set_image (named-image "process-stop")))
+      new-tab (Gtk.Button {
+                           :on_clicked #(bus:publish :new-tab)
+                           :label "➕"
+                           })
       refresh (doto (Gtk.Button {
                                  :on_clicked #(bus:publish :reload)
                                  })
                 (: :set_image (named-image "view-refresh")))
-      ;; views (Gtk.Notebook {
-      ;;                      :show_tabs false
-      ;;                      })
-      webview (new-webview bus)
+      views (pane-cave bus)
+      next-tab (Gtk.Button {
+                            :label ">>"
+                            :on_clicked  #(views:next-tab)
+                            })
+
       back (doto
                (Gtk.Button {
                             :on_clicked #(bus:publish :go-back)
@@ -161,24 +191,23 @@ progress, trough {
   (bus:subscribe :stop-loading
                  (fn [] (stop:hide) (refresh:show)))
 
+  (views:new-tab)
+
   (nav-bar:pack_start back false false 2)
   (nav-bar:pack_start refresh false false 2)
   (nav-bar:pack_start stop false false 2)
   (nav-bar:pack_start url  true true 2)
+  (nav-bar:pack_end next-tab false false 2)
+  (nav-bar:pack_end new-tab false false 2)
 
   (container:pack_start nav-bar false false 5)
   (container:pack_start progress-bar false false 0)
-  (container:pack_start webview true true 5)
-
-  (bus:publish :fetch current-url)
+  (container:pack_start views.widget true true 5)
 
   (window:add container)
 
-  (window:show_all))
-
-(: (WebKit2.WebContext:get_default) :get_website_data_manager)
-
-
+  (window:show_all)
+  (bus:publish :fetch current-url))
 
 
 (Gtk.main)
