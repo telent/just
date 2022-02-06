@@ -104,15 +104,42 @@ progress, trough {
     (load-adblocks webview.user_content_manager content-filter-store)
     webview))
 
+(fn update-tab-overview [bus tabs scrolledwindow]
+  (let [box (Gtk.Box {
+                      :orientation Gtk.Orientation.VERTICAL
+                      })]
+
+    (each [_ w (ipairs (scrolledwindow:get_children))]
+      (scrolledwindow:remove w))
+
+    (each [i w (pairs tabs)]
+      (when (> i 0)
+        (box:pack_start (Gtk.Button {
+                                     :label w.title
+                                     :on_clicked
+                                     #(bus:publish :switch-tab i)
+                                     })
+                        false false 5)))
+    (scrolledwindow:add box)
+    (scrolledwindow:show_all)
+    ))
+
+
 (fn pane-cave [bus]
-  (let [widget (Gtk.Notebook { :show_tabs false })
-        tabs {}
-        new-tab (fn []
-                  (print "new tab")
-                  (let [v (new-webview bus)
+  (let [tabs {}
+        widget (Gtk.Notebook {
+                              :show_tabs false
+                              :on_switch_page
+                              (fn [self page num]
+                                (when  (= num 0)
+                                  (update-tab-overview bus tabs page)))
+                              })
+        new-tab (fn [self child]
+                  (let [v (or child (new-webview bus))
                         i (widget:append_page v)]
                     (tset tabs i v)
                     (v:show)
+                    (set widget.page i)
                     v))
         current #(. tabs widget.page)]
     (bus:subscribe :fetch  #(match (current) c (c:load_uri $1)))
@@ -123,22 +150,22 @@ progress, trough {
     (bus:subscribe :go-back
                    #(match (current) c (and (c:can_go_back) (c:go_back))))
     (bus:subscribe :new-tab new-tab)
+    (bus:subscribe :switch-tab (fn [i] (widget:set_current_page i)))
+
+    (new-tab nil (Gtk.ScrolledWindow))
     {
      :new-tab new-tab
      :current-tab current
      :widget widget
-     :next-tab (fn [self]
-                 (let [n (+ 1 widget.page)]
-                   (widget:set_current_page (if (. tabs n) n 0)))
-                 (widget:get_current_page))
+     :show-tab-overview #(widget:set_current_page 0)
      }))
 
 (let [current-url "https://terse.telent.net"
       bus (event-bus)
       window (Gtk.Window {
                           :title "Just browsing"
-                          :default_width 800
-                          :default_height 600
+                          :default_width 360
+                          :default_height 720
                           :on_destroy Gtk.main_quit
                           })
       container (Gtk.Box {
@@ -169,9 +196,9 @@ progress, trough {
                                  })
                 (: :set_image (named-image "view-refresh")))
       views (pane-cave bus)
-      next-tab (Gtk.Button {
-                            :label ">>"
-                            :on_clicked  #(views:next-tab)
+      show-tabs (Gtk.Button {
+                            :label "><"
+                            :on_clicked  #(views:show-tab-overview)
                             })
 
       back (doto
@@ -197,7 +224,7 @@ progress, trough {
   (nav-bar:pack_start refresh false false 2)
   (nav-bar:pack_start stop false false 2)
   (nav-bar:pack_start url  true true 2)
-  (nav-bar:pack_end next-tab false false 2)
+  (nav-bar:pack_end show-tabs false false 2)
   (nav-bar:pack_end new-tab false false 2)
 
   (container:pack_start nav-bar false false 5)
