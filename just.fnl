@@ -145,7 +145,6 @@ progress, trough {
   (bus:subscribe :reload #(webview:reload))
   (bus:subscribe :url-changed #(url:set_text $1))
 
-  (bus:subscribe :url-changed #(print (.. "visiting " $1)))
   (bus:subscribe :title-changed #(window:set_title
                                   (.. $1 " - Just browsing")))
 
