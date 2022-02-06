@@ -2,7 +2,9 @@
 (local inspect (require :inspect))
 
 (local Gtk lgi.Gtk)
+(local Gdk lgi.Gdk)
 (local WebKit2 lgi.WebKit2)
+(local cairo lgi.cairo)
 
 (local cache-dir (.. (os.getenv "HOME") "/.cache/just"))
 
@@ -104,6 +106,37 @@ progress, trough {
     (load-adblocks webview.user_content_manager content-filter-store)
     webview))
 
+(fn scale-surface [source]
+  (let [image-width 300
+        image-height 200
+        scaled (cairo.ImageSurface.create
+                cairo.Format.ARGB32
+                image-width image-height)
+        ctx (cairo.Context.create scaled)
+        source-width (cairo.ImageSurface.get_width source)
+        source-height (cairo.ImageSurface.get_height source)
+        scale (/ image-width source-width)]
+    ;; XXX do we need to destroy this context? the example
+    ;; in C called cairo_destroy(cr), but I haven't found a
+    ;; gi equivalent
+    (doto ctx
+      (: :scale scale scale)
+      (: :set_source_surface source 0 0)
+      (: :paint))
+    scaled))
+
+(fn load-webview-thumbnail [button webview]
+  (webview:get_snapshot
+   WebKit2.SnapshotRegion.VISIBLE
+   WebKit2.SnapshotOptions.NONE
+   nil
+   (fn [self res]
+     (let [surface (webview:get_snapshot_finish res)
+           scaled (scale-surface surface)
+           img (doto (Gtk.Image) (: :set_from_surface scaled))]
+       (button:set_image img)))))
+
+
 (fn update-tab-overview [bus tabs scrolledwindow]
   (let [box (Gtk.Box {
                       :orientation Gtk.Orientation.VERTICAL
@@ -114,12 +147,16 @@ progress, trough {
 
     (each [i w (pairs tabs)]
       (when (> i 0)
-        (box:pack_start (Gtk.Button {
-                                     :label w.title
-                                     :on_clicked
-                                     #(bus:publish :switch-tab i)
-                                     })
-                        false false 5)))
+        (box:pack_start
+         (doto (Gtk.Button {
+                            :label w.title
+                            :image-position Gtk.PositionType.TOP
+                            :relief Gtk.ReliefStyle.NONE
+                            :on_clicked
+                            #(bus:publish :switch-tab i)
+                            })
+           (load-webview-thumbnail w))
+         false false 5)))
     (scrolledwindow:add box)
     (scrolledwindow:show_all)
     ))
