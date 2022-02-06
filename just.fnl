@@ -157,9 +157,9 @@ progress, trough {
   (load-adblocks webview.user_content_manager content-filter-store)
 
   (nav-bar:pack_start back false false 2)
+  (nav-bar:pack_start refresh false false 2)
+  (nav-bar:pack_start stop false false 2)
   (nav-bar:pack_start url  true true 2)
-  (nav-bar:pack_end refresh false false 2)
-  (nav-bar:pack_end stop false false 2)
 
   (container:pack_start nav-bar false false 5)
   (container:pack_start progress-bar false false 0)
