@@ -9,8 +9,6 @@
 (local content-filter-store
        (WebKit2.UserContentFilterStore {:path cache-dir}))
 
-
-
 (-> (WebKit2.WebContext:get_default)
     (: :get_website_data_manager)
     (: :get_cookie_manager)
@@ -105,6 +103,9 @@ progress, trough {
     (bus:subscribe :fetch #(webview:load_uri $1))
     (bus:subscribe :stop-loading #(webview:stop_loading))
     (bus:subscribe :reload #(webview:reload))
+    (bus:subscribe :go-back #(if (webview:can_go_back)
+                                 (webview:go_back)))
+
     (load-adblocks webview.user_content_manager content-filter-store)
     webview))
 
@@ -139,12 +140,13 @@ progress, trough {
                                  :on_clicked #(bus:publish :reload)
                                  })
                 (: :set_image (named-image "view-refresh")))
+      ;; views (Gtk.Notebook {
+      ;;                      :show_tabs false
+      ;;                      })
       webview (new-webview bus)
       back (doto
                (Gtk.Button {
-                            :on_clicked (fn [s]
-                                          (if (webview:can_go_back)
-                                              (webview:go_back)))
+                            :on_clicked #(bus:publish :go-back)
                             })
              (: :set_image (named-image "go-previous")))]
 
