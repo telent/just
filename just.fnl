@@ -97,6 +97,17 @@ progress, trough {
     (bus:publish (if self.is_loading :start-loading :stop-loading))
     ))
 
+(fn new-webview [bus]
+  (let [webview (WebKit2.WebView {
+                                  :on_notify
+                                  #(handle-webview-properties $1 $2 bus)
+                                  })]
+    (bus:subscribe :fetch #(webview:load_uri $1))
+    (bus:subscribe :stop-loading #(webview:stop_loading))
+    (bus:subscribe :reload #(webview:reload))
+    (load-adblocks webview.user_content_manager content-filter-store)
+    webview))
+
 (let [current-url "https://terse.telent.net"
       bus (event-bus)
       window (Gtk.Window {
@@ -128,10 +139,7 @@ progress, trough {
                                  :on_clicked #(bus:publish :reload)
                                  })
                 (: :set_image (named-image "view-refresh")))
-      webview (WebKit2.WebView {
-                                :on_notify
-                                #(handle-webview-properties $1 $2 bus)
-                                })
+      webview (new-webview bus)
       back (doto
                (Gtk.Button {
                             :on_clicked (fn [s]
@@ -140,9 +148,6 @@ progress, trough {
                             })
              (: :set_image (named-image "go-previous")))]
 
-  (bus:subscribe :fetch #(webview:load_uri $1))
-  (bus:subscribe :stop-loading #(webview:stop_loading))
-  (bus:subscribe :reload #(webview:reload))
   (bus:subscribe :url-changed #(url:set_text $1))
 
   (bus:subscribe :title-changed #(window:set_title
@@ -154,8 +159,6 @@ progress, trough {
   (bus:subscribe :stop-loading
                  (fn [] (stop:hide) (refresh:show)))
 
-  (load-adblocks webview.user_content_manager content-filter-store)
-
   (nav-bar:pack_start back false false 2)
   (nav-bar:pack_start refresh false false 2)
   (nav-bar:pack_start stop false false 2)
@@ -165,7 +168,7 @@ progress, trough {
   (container:pack_start progress-bar false false 0)
   (container:pack_start webview true true 5)
 
-  (webview:load_uri current-url)
+  (bus:publish :fetch current-url)
 
   (window:add container)
 
