@@ -85,12 +85,11 @@ progress, trough {
     (bus:publish :loading-progress self.estimated_load_progress)
 
     "is-loading"
-    (bus:publish :loading? self.is_loading)
+    (bus:publish (if self.is_loading :start-loading :stop-loading))
     ))
 
 (let [current-url "https://terse.telent.net/admin/stream"
       bus (event-bus)
-      r {}
       window (Gtk.Window {
                           :title "Just browsing"
                           :default_width 800
@@ -114,14 +113,14 @@ progress, trough {
                               (bus:publish :fetch self.text))
                             })
             (: :set_text current-url))
-      stop-refresh (Gtk.Button {
-                                :on_clicked
-                                (fn [s]
-                                  (bus:publish
-                                   (if r.webview.is_loading
-                                       :stop-loading
-                                       :reload)))
-                                })
+      stop (doto (Gtk.Button {
+                             :on_clicked #(bus:publish :stop-loading)
+                             })
+                (: :set_image (named-image "process-stop")))
+      refresh (doto (Gtk.Button {
+                                 :on_clicked #(bus:publish :reload)
+                                 })
+                (: :set_image (named-image "view-refresh")))
       webview (WebKit2.WebView {
                                 :on_notify
                                 #(handle-webview-properties $1 $2 bus)
@@ -144,17 +143,17 @@ progress, trough {
                                   (.. $1 " - Just browsing")))
 
   (bus:subscribe :loading-progress #(tset progress-bar :fraction $1))
-  (bus:subscribe :loading?
-                 #(stop-refresh:set_image
-                   (named-image
-                    (if $1 "process-stop" "view-refresh"))))
+  (bus:subscribe :start-loading
+                 (fn [] (stop:show) (refresh:hide)))
+  (bus:subscribe :stop-loading
+                 (fn [] (stop:hide) (refresh:show)))
 
-  (tset r :webview webview)
   (load-adblocks webview.user_content_manager content-filter-store)
 
   (nav-bar:pack_start back false false 2)
   (nav-bar:pack_start url  true true 2)
-  (nav-bar:pack_end stop-refresh false false 2)
+  (nav-bar:pack_end refresh false false 2)
+  (nav-bar:pack_end stop false false 2)
 
   (container:pack_start nav-bar false false 5)
   (container:pack_start progress-bar false false 0)
