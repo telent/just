@@ -12,8 +12,8 @@
 (fn event-bus []
   (let [subscriptions {}
         vivify (fn [n v]
-                 (or (. n v)
-                     (do (tset n v {}) (. n v))))]
+                 (or (. n v) (tset n v {}))
+                 (. n v))]
     {
      :subscriptions subscriptions
      :subscribe (fn [self event-name handler]
