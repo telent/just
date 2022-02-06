@@ -73,26 +73,20 @@ progress, trough {
 
 
 (fn handle-webview-properties [self pspec bus]
-  (if (= pspec.name "uri")
-      (bus:publish
-       :url-changed self.uri)
+  (match pspec.name
+    "uri"
+    (bus:publish :url-changed self.uri)
 
-      (and (= pspec.name "title")
-           (> (# self.title) 0))
-      (bus:publish
-       :title-changed
-       self.title)
+    "title"
+    (if (> (self.title:len) 0)
+        (bus:publish :title-changed self.title))
 
-      (= pspec.name
-         "estimated-load-progress")
-      (bus:publish
-       :loading-progress
-       self.estimated_load_progress)
+    "estimated-load-progress"
+    (bus:publish :loading-progress self.estimated_load_progress)
 
-      (= pspec.name "is-loading")
-      (bus:publish
-       :loading? self.is_loading)
-      ))
+    "is-loading"
+    (bus:publish :loading? self.is_loading)
+    ))
 
 (let [current-url "https://terse.telent.net/admin/stream"
       bus (event-bus)
