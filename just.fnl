@@ -4,10 +4,19 @@
 (local Gtk lgi.Gtk)
 (local WebKit2 lgi.WebKit2)
 
-(local cache-dir (.. (os.getenv "HOME") "/.cache"))
+(local cache-dir (.. (os.getenv "HOME") "/.cache/just"))
 
 (local content-filter-store
        (WebKit2.UserContentFilterStore {:path cache-dir}))
+
+
+
+(-> (WebKit2.WebContext:get_default)
+    (: :get_website_data_manager)
+    (: :get_cookie_manager)
+    (: :set_persistent_storage
+       (.. cache-dir "/cookies.db")
+       WebKit2.CookiePersistentStorage.SQLITE))
 
 (fn event-bus []
   (let [subscriptions {}
@@ -88,7 +97,7 @@ progress, trough {
     (bus:publish (if self.is_loading :start-loading :stop-loading))
     ))
 
-(let [current-url "https://terse.telent.net/admin/stream"
+(let [current-url "https://terse.telent.net"
       bus (event-bus)
       window (Gtk.Window {
                           :title "Just browsing"
@@ -107,12 +116,10 @@ progress, trough {
                                      :fraction 1.0
                                      :margin 0
                                      })
-      url (doto (Gtk.Entry {
-                            :on_activate
-                            (fn [self]
-                              (bus:publish :fetch self.text))
-                            })
-            (: :set_text current-url))
+      url (Gtk.Entry {
+                      :on_activate
+                      (fn [self] (bus:publish :fetch self.text))
+                      })
       stop (doto (Gtk.Button {
                              :on_clicked #(bus:publish :stop-loading)
                              })
@@ -164,5 +171,10 @@ progress, trough {
   (window:add container)
 
   (window:show_all))
+
+(: (WebKit2.WebContext:get_default) :get_website_data_manager)
+
+
+
 
 (Gtk.main)
