@@ -12,3 +12,5 @@ Touchscreen-friendly wrapper around Webkit
 - some kind of bookmarks/favourites/pinned tabs/memory of visited sites
 - ESC in url bar cancels typing
 - warning for insecure sites
+- try video and audio
+- does it save passwords? find out! where?
