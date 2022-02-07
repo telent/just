@@ -136,6 +136,20 @@ progress, trough {
            img (doto (Gtk.Image) (: :set_from_surface scaled))]
        (button:set_image img)))))
 
+(fn connect-swipe-gesture [widget bus index]
+  (Gtk.GestureSwipe {
+                     :widget widget
+                     :on_update
+                     (fn [self]
+                       (self:set_state Gtk.EventSequenceState.CLAIMED))
+                     :on_swipe
+                     (fn [self x y]
+                       (if (and (< 700 x) (< y 700))
+                           (bus:publish :close-tab index)
+                           (self:set_state Gtk.EventSequenceState.DENIED))
+                       true)
+                     }))
+
 
 (fn update-tab-overview [bus tabs scrolledwindow]
   (let [box (Gtk.Box {
@@ -149,14 +163,14 @@ progress, trough {
       (when (> i 0)
         (box:pack_start
          (doto (Gtk.Button {
-                            :label w.title
                             :image-position Gtk.PositionType.TOP
-                            :relief Gtk.ReliefStyle.NONE
                             :on_clicked
                             #(bus:publish :switch-tab i)
                             })
+           (connect-swipe-gesture bus i)
            (load-webview-thumbnail w))
          false false 5)))
+
     (scrolledwindow:add box)
     (scrolledwindow:show_all)
     ))
@@ -168,7 +182,7 @@ progress, trough {
                               :show_tabs false
                               :on_switch_page
                               (fn [self page num]
-                                (when  (= num 0)
+                                (when (= num 0)
                                   (update-tab-overview bus tabs page)))
                               })
         new-tab (fn [self child]
@@ -178,6 +192,7 @@ progress, trough {
                     (v:show)
                     (set widget.page i)
                     v))
+        tab-overview (Gtk.ScrolledWindow)
         current #(. tabs widget.page)]
     (bus:subscribe :fetch  #(match (current) c (c:load_uri $1)))
     (bus:subscribe :stop-loading
@@ -187,9 +202,14 @@ progress, trough {
     (bus:subscribe :go-back
                    #(match (current) c (and (c:can_go_back) (c:go_back))))
     (bus:subscribe :new-tab new-tab)
-    (bus:subscribe :switch-tab (fn [i] (widget:set_current_page i)))
+    (bus:subscribe :switch-tab #(widget:set_current_page $1))
+    (bus:subscribe :close-tab
+                   (fn [i]
+                     (tset tabs i nil)
+                     (update-tab-overview bus tabs tab-overview)
+                     (widget:set_current_page 0)))
+    (new-tab nil tab-overview)
 
-    (new-tab nil (Gtk.ScrolledWindow))
     {
      :new-tab new-tab
      :current-tab current
