@@ -159,6 +159,9 @@ progress, trough {
     (each [_ w (ipairs (scrolledwindow:get_children))]
       (scrolledwindow:remove w))
 
+    (box:add (Gtk.Label { :label "Open tabs" }))
+
+
     (each [i w (pairs tabs)]
       (when (> i 0)
         (box:pack_start
@@ -275,7 +278,8 @@ progress, trough {
   (bus:subscribe :stop-loading
                  (fn [] (stop:hide) (refresh:show)))
 
-  (views:new-tab)
+  (each [_ url (ipairs arg)]
+    (views:new-tab))
 
   (nav-bar:pack_start back false false 2)
   (nav-bar:pack_start refresh false false 2)
@@ -291,7 +295,14 @@ progress, trough {
   (window:add container)
 
   (window:show_all)
-  (bus:publish :fetch current-url))
 
+  (each [i url (ipairs arg)]
+    (lgi.GLib.timeout_add_seconds
+     0
+     (* 2 i)
+     (fn []
+       (bus:publish :switch-tab i)
+       (bus:publish :fetch url)
+       false))))
 
 (Gtk.main)
