@@ -27,9 +27,9 @@
      :subscriptions subscriptions
      :subscribe (fn [self event-name handler]
                   (table.insert (vivify subscriptions event-name) handler))
-     :publish (fn [self event-name payload]
+     :publish (fn [self sender event-name payload]
                 (each [_ handler (pairs (. subscriptions event-name))]
-                  (handler payload)))
+                  (handler sender payload)))
      :unsubscribe (fn [self event-name handler]
                     (table.remove (. subscriptions event-name) handler))
      }))
@@ -84,24 +84,23 @@ progress, trough {
 (fn handle-webview-properties [self pspec bus]
   (match pspec.name
     "uri"
-    (bus:publish :url-changed self.uri)
+    (bus:publish self :url-changed self.uri)
 
     "title"
     (if (> (self.title:len) 0)
-        (bus:publish :title-changed self.title))
+        (bus:publish self :title-changed self.title))
 
     "estimated-load-progress"
-    (bus:publish :loading-progress self.estimated_load_progress)
+    (bus:publish self :loading-progress self.estimated_load_progress)
 
     "is-loading"
-    (bus:publish (if self.is_loading :start-loading :stop-loading))
+    (bus:publish self  (if self.is_loading :start-loading :stop-loading))
     ))
 
 (fn new-webview [bus]
   (let [webview (WebKit2.WebView {
                                   :on_notify
                                   #(handle-webview-properties $1 $2 bus)
-
                                   })]
     (load-adblocks webview.user_content_manager content-filter-store)
     webview))
@@ -145,7 +144,7 @@ progress, trough {
                      :on_swipe
                      (fn [self x y]
                        (if (and (< 700 x) (< y 700))
-                           (bus:publish :close-tab index)
+                           (bus:publish self :close-tab index)
                            (self:set_state Gtk.EventSequenceState.DENIED))
                        true)
                      }))
@@ -168,7 +167,7 @@ progress, trough {
          (doto (Gtk.Button {
                             :image-position Gtk.PositionType.TOP
                             :on_clicked
-                            #(bus:publish :switch-tab i)
+                            #(bus:publish $1 :switch-tab i)
                             })
            (connect-swipe-gesture bus i)
            (load-webview-thumbnail w))
@@ -197,17 +196,26 @@ progress, trough {
                     v))
         tab-overview (Gtk.ScrolledWindow)
         current #(. tabs widget.page)]
-    (bus:subscribe :fetch  #(match (current) c (c:load_uri $1)))
+    (bus:subscribe :fetch  #(match (current) c (c:load_uri $2)))
     (bus:subscribe :stop-loading
                    #(match (current) c (c:stop_loading)))
     (bus:subscribe :reload
                    #(match (current) c (c:reload)))
     (bus:subscribe :go-back
                    #(match (current) c (and (c:can_go_back) (c:go_back))))
+
     (bus:subscribe :new-tab new-tab)
-    (bus:subscribe :switch-tab #(widget:set_current_page $1))
+    (bus:subscribe :switch-tab
+                   (fn [sender index]
+                     (widget:set_current_page index)
+                     (let [tab (. tabs index)]
+                       (when (and tab tab.uri tab.title)
+                         (bus:publish tab :url-changed tab.uri)
+                         (bus:publish tab :title-changed tab.title)
+                         ))))
+
     (bus:subscribe :close-tab
-                   (fn [i]
+                   (fn [sender i]
                      (tset tabs i nil)
                      (update-tab-overview bus tabs tab-overview)
                      (widget:set_current_page 0)))
@@ -241,18 +249,18 @@ progress, trough {
                                      })
       url (Gtk.Entry {
                       :on_activate
-                      (fn [self] (bus:publish :fetch self.text))
+                      (fn [self] (bus:publish self :fetch self.text))
                       })
       stop (doto (Gtk.Button {
-                             :on_clicked #(bus:publish :stop-loading)
+                             :on_clicked #(bus:publish $1 :stop-loading)
                              })
                 (: :set_image (named-image "process-stop")))
       new-tab (Gtk.Button {
-                           :on_clicked #(bus:publish :new-tab)
+                           :on_clicked #(bus:publish $1 :new-tab)
                            :label "➕"
                            })
       refresh (doto (Gtk.Button {
-                                 :on_clicked #(bus:publish :reload)
+                                 :on_clicked #(bus:publish $1 :reload)
                                  })
                 (: :set_image (named-image "view-refresh")))
       views (pane-cave bus)
@@ -260,23 +268,31 @@ progress, trough {
                             :label "><"
                             :on_clicked  #(views:show-tab-overview)
                             })
-
       back (doto
                (Gtk.Button {
-                            :on_clicked #(bus:publish :go-back)
+                            :on_clicked #(bus:publish $1 :go-back)
                             })
-             (: :set_image (named-image "go-previous")))]
+             (: :set_image (named-image "go-previous")))
+      visible? (fn [tab]
+                 (= (views:current-tab) tab))]
 
-  (bus:subscribe :url-changed #(url:set_text $1))
+  (bus:subscribe :url-changed
+                 #(when (visible? $1) (url:set_text $2)))
 
-  (bus:subscribe :title-changed #(window:set_title
-                                  (.. $1 " - Just browsing")))
+  (bus:subscribe :title-changed
+                 #(when (visible? $1)
+                    (window:set_title
+                     (.. $2 " - Just browsing"))))
 
-  (bus:subscribe :loading-progress #(tset progress-bar :fraction $1))
+  (bus:subscribe :loading-progress
+                 #(when (visible? $1)
+                    (tset progress-bar :fraction $2)))
   (bus:subscribe :start-loading
-                 (fn [] (stop:show) (refresh:hide)))
+                 #(when (visible? $1)
+                    (stop:show) (refresh:hide)))
   (bus:subscribe :stop-loading
-                 (fn [] (stop:hide) (refresh:show)))
+                 #(when (visible? $1)
+                    (stop:hide) (refresh:show)))
 
   (each [_ url (ipairs arg)]
     (views:new-tab))
@@ -301,8 +317,8 @@ progress, trough {
      0
      (* 2 i)
      (fn []
-       (bus:publish :switch-tab i)
-       (bus:publish :fetch url)
+       (bus:publish window :switch-tab i)
+       (bus:publish window :fetch url)
        false))))
 
 (Gtk.main)
