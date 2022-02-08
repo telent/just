@@ -24,7 +24,6 @@
                  (tset n v (or (. n v) []))
                  (. n v))]
     {
-     :subscriptions subscriptions
      :subscribe (fn [self event-name handler]
                   (table.insert (vivify subscriptions event-name) handler))
      :publish (fn [self sender event-name payload]
@@ -228,8 +227,14 @@ progress, trough {
      :show-tab-overview #(widget:set_current_page 0)
      }))
 
-(let [current-url "https://terse.telent.net"
-      bus (event-bus)
+(local completions
+       (doto (Gtk.ListStore)
+         (: :set_column_types [lgi.GObject.Type.STRING])))
+
+(fn add-autocomplete-suggestion [url]
+  (completions:append [url]))
+
+(let [bus (event-bus)
       window (Gtk.Window {
                           :title "Just browsing"
                           :default_width 360
@@ -248,6 +253,7 @@ progress, trough {
                                      :margin 0
                                      })
       url (Gtk.Entry {
+                      :completion (Gtk.EntryCompletion {:model completions :text_column 0 })
                       :on_activate
                       (fn [self] (bus:publish self :fetch self.text))
                       })
@@ -311,6 +317,8 @@ progress, trough {
   (window:add container)
 
   (window:show_all)
+
+  (bus:subscribe :fetch #(add-autocomplete-suggestion $2))
 
   (each [i url (ipairs arg)]
     (lgi.GLib.timeout_add_seconds
