@@ -1,6 +1,5 @@
 { stdenv
 , callPackage
-, dconf
 , fetchFromGitHub
 , fetchurl
 , glib-networking
@@ -34,6 +33,8 @@ in stdenv.mkDerivation {
   src =./.;
   inherit fennel;
 
+  # this will have to go into a makeWrapper thingy when we
+  # get to the point of producing an actual package
   GIO_EXTRA_MODULES = "${glib-networking}/lib/gio/modules";
   buildInputs = [ lua gtk3 webkitgtk gobject-introspection.dev
                   glib-networking  ];
