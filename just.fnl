@@ -21,7 +21,7 @@
 (fn event-bus []
   (let [subscriptions {}
         vivify (fn [n v]
-                 (or (. n v) (tset n v {}))
+                 (tset n v (or (. n v) []))
                  (. n v))]
     {
      :subscriptions subscriptions
