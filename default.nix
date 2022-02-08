@@ -1,5 +1,6 @@
 { stdenv
 , callPackage
+, dconf
 , fetchFromGitHub
 , fetchurl
 , glib-networking
