@@ -2,6 +2,7 @@
 , callPackage
 , fetchFromGitHub
 , fetchurl
+, glib-networking
 , gobject-introspection
 , gtk3
 , gnome3
@@ -32,7 +33,9 @@ in stdenv.mkDerivation {
   src =./.;
   inherit fennel;
 
-  buildInputs = [ lua gtk3 webkitgtk gobject-introspection.dev ];
+  GIO_EXTRA_MODULES = "${glib-networking}/lib/gio/modules";
+  buildInputs = [ lua gtk3 webkitgtk gobject-introspection.dev
+                  glib-networking  ];
   nativeBuildInputs = [ lua makeWrapper ];
 
   makeFlags = [ "PREFIX=${placeholder "out"}" ];
