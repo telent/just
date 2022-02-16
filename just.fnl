@@ -195,12 +195,15 @@ progress, trough {
                                 (when (= num 0)
                                   (update-tab-overview bus tabs page)))
                               })
-        new-tab (fn [self child]
-                  (let [v (or child (new-webview bus))
-                        i (widget:append_page v)]
+        add-page (fn [v]
+                   (let [i (widget:append_page v)]
                     (tset tabs i v)
                     (v:show)
                     (set widget.page i)
+                    v))
+        new-tab (fn [self]
+                  (let [v (add-page (new-webview bus))]
+                    (v:load_uri "about:blank")
                     v))
         tab-overview (Gtk.ScrolledWindow)
         current #(. tabs widget.page)]
@@ -227,7 +230,7 @@ progress, trough {
                      (tset tabs i nil)
                      (update-tab-overview bus tabs tab-overview)
                      (widget:set_current_page 0)))
-    (new-tab nil tab-overview)
+    (add-page tab-overview)
 
     {
      :new-tab new-tab
