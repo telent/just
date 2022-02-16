@@ -160,7 +160,6 @@ progress, trough {
 
     (box:add (Gtk.Label { :label "Open tabs" }))
 
-
     (each [i w (pairs tabs)]
       (when (> i 0)
         (box:pack_start
@@ -172,6 +171,15 @@ progress, trough {
            (connect-swipe-gesture bus i)
            (load-webview-thumbnail w))
          false false 5)))
+
+    (box:pack_start (Gtk.Button
+                     {
+                      :label " + "
+                      :width 300
+                      :height 200
+                      :on_clicked #(bus:publish $1 :new-tab)
+                      })
+                    false false 5)
 
     (scrolledwindow:add box)
     (scrolledwindow:show_all)
@@ -225,7 +233,11 @@ progress, trough {
      :new-tab new-tab
      :current-tab current
      :widget widget
-     :show-tab-overview #(widget:set_current_page 0)
+     :show-tab-overview (fn []
+                          (widget:set_current_page 0)
+                          (bus:publish tab-overview :url-changed false)
+                          (bus:publish tab-overview :title-changed "Open tabs"))
+
      }))
 
 (let [current-url "https://terse.telent.net"
@@ -255,10 +267,6 @@ progress, trough {
                              :on_clicked #(bus:publish $1 :stop-loading)
                              })
                 (: :set_image (named-image "process-stop")))
-      new-tab (Gtk.Button {
-                           :on_clicked #(bus:publish $1 :new-tab)
-                           :label "➕"
-                           })
       refresh (doto (Gtk.Button {
                                  :on_clicked #(bus:publish $1 :reload)
                                  })
@@ -277,7 +285,10 @@ progress, trough {
                  (= (views:current-tab) tab))]
 
   (bus:subscribe :url-changed
-                 #(when (visible? $1) (url:set_text $2)))
+                 #(when (visible? $1)
+                    (doto url
+                      (: :set_text (or $2 ""))
+                      (: :set_editable (and $2 true)))))
 
   (bus:subscribe :title-changed
                  #(when (visible? $1)
@@ -302,7 +313,6 @@ progress, trough {
   (nav-bar:pack_start stop false false 2)
   (nav-bar:pack_start url  true true 2)
   (nav-bar:pack_end show-tabs false false 2)
-  (nav-bar:pack_end new-tab false false 2)
 
   (container:pack_start nav-bar false false 5)
   (container:pack_start progress-bar false false 0)
