@@ -21,7 +21,7 @@
   (let [el (get data self path)]
     (when el
       (if el._subscribers
-          (el._subscribers:insert fun)
+          (table.insert el._subscribers fun)
           (tset el :_subscribers [fun])))))
 
 (fn new [data]

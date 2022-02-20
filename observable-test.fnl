@@ -57,3 +57,11 @@
   (s:observe [:foo :bar] #(set win 4))
   (s:update [:foo :bar :baz] 42)
   (expect (= win 2)))
+
+(let [s (observable.new {:foo {:bar {:baz 43}}})]
+  (var win 0)
+  ;; multiple observers can live on same subtree
+  (s:observe [:foo :bar] #(set win (+ win 1)))
+  (s:observe [:foo :bar] #(set win (+ win 1)))
+  (s:update [:foo :bar :baz] 42)
+  (expect (= win 2)))
