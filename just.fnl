@@ -1,8 +1,9 @@
 (local lgi (require :lgi))
-(local inspect (require :inspect))
-
 (local { : Gtk : Gdk : WebKit2 : cairo } lgi)
 
+(local inspect (require :inspect))
+
+(local observable (require :observable))
 
 (local cache-dir (.. (os.getenv "HOME") "/.cache/just"))
 
@@ -15,6 +16,32 @@
     (: :set_persistent_storage
        (.. cache-dir "/cookies.db")
        WebKit2.CookiePersistentStorage.SQLITE))
+
+(comment
+ (local app-state
+        {
+         :panes [
+                 {
+                  :current-uri "https://ex.com"
+                  :uri-entry "https://ex.comsdfdg"
+                  :title "helo"
+                  :snapshot nil ; recent image snapshot for overview
+                  :load-progress nil ; between 0 and 1 if loading
+                  :index 1
+                  }
+                 ]
+         :visible-pane 1
+         :completions []
+         }))
+
+(local app-state
+       (observable.new {
+                        :panes { 1 {:title "blank"} }
+                        :visible-pane nil
+                        :completions []
+                        }))
+
+(app-state:observe [] #(print (inspect (app-state:get []))))
 
 (fn event-bus []
   (let [subscriptions {}
@@ -78,27 +105,31 @@ progress, trough {
    ))
 
 
-(fn handle-webview-properties [self pspec bus]
+(fn handle-webview-properties [self index pspec bus]
   (match pspec.name
     "uri"
-    (bus:publish self :url-changed self.uri)
+    (do
+      (app-state:update [:panes index :current-uri] self.uri)
+      (bus:publish self :url-changed self.uri))
 
     "title"
-    (if (> (self.title:len) 0)
-        (bus:publish self :title-changed self.title))
+    (when (> (self.title:len) 0)
+      (app-state:update [:panes index :title] self.title)
+      (bus:publish self :title-changed self.title))
 
     "estimated-load-progress"
-    (bus:publish self :loading-progress self.estimated_load_progress)
+    (let [progress self.estimated_load_progress]
+      (app-state:update [:panes index :load-progress] progress)
+      (bus:publish self :loading-progress progress))
 
     "is-loading"
-    (bus:publish self  (if self.is_loading :start-loading :stop-loading))
+    (let [loading? self.is_loading]
+      (bus:publish self  (if loading? :start-loading :stop-loading))
+      (if (not loading?) (app-state:update [:panes index :load-progress] nil)))
     ))
 
 (fn new-webview [bus]
-  (let [webview (WebKit2.WebView {
-                                  :on_notify
-                                  #(handle-webview-properties $1 $2 bus)
-                                  })]
+  (let [webview (WebKit2.WebView { })]
     (load-adblocks webview.user_content_manager content-filter-store)
     webview))
 
@@ -197,9 +228,16 @@ progress, trough {
                     (tset tabs i v)
                     (v:show)
                     (set widget.page i)
-                    v))
+                    (values v i)))
         new-tab (fn [self]
-                  (let [v (add-page (new-webview bus))]
+                  (let [(v i) (add-page (new-webview bus))]
+                    (app-state:update [:panes i] {
+                                                  :index i
+                                                  :title "blank"
+                                                  })
+                    (tset v
+                          :on_notify
+                          #(handle-webview-properties $1 i $2 bus))
                     (v:load_uri "about:blank")
                     v))
         tab-overview (Gtk.ScrolledWindow)
@@ -216,6 +254,7 @@ progress, trough {
     (bus:subscribe :switch-tab
                    (fn [sender index]
                      (widget:set_current_page index)
+                     (app-state:update [:current-pane] index)
                      (let [tab (. tabs index)]
                        (when (and tab tab.uri tab.title)
                          (bus:publish tab :url-changed tab.uri)
@@ -234,6 +273,7 @@ progress, trough {
      :current-tab current
      :widget widget
      :show-tab-overview (fn []
+                          (app-state:update [:current-pane] nil)
                           (widget:set_current_page 0)
                           (bus:publish tab-overview :url-changed false)
                           (bus:publish tab-overview :title-changed "Open tabs"))
