@@ -6,7 +6,10 @@
 (fn update [data self path value]
   (let [[first & rest] path]
     (if (next rest)
-        (update (. data first) self rest value)
+        (do
+          (update (. data first) self rest value)
+          (if data._subscribers
+              (each [_ f (pairs data._subscribers)] (f))))
         (do
           (if data._subscribers
               (each [_ f (pairs data._subscribers)] (f)))

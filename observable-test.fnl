@@ -49,3 +49,11 @@
   (s:observe [:foo] #(set win true))
   (s:update [:foo :bar] 42)
   (expect (and win)))
+
+(let [s (observable.new {:foo {:bar {:baz 43}}})]
+  (var win 0)
+  ;; observers on ancestor trees are called after child trees
+  (s:observe [:foo] #(set win (/ win 2)))
+  (s:observe [:foo :bar] #(set win 4))
+  (s:update [:foo :bar :baz] 42)
+  (expect (= win 2)))
