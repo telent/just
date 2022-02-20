@@ -67,12 +67,12 @@
 (fn load-easylist-json [store cb]
   (print "loading easylist from json")
   (with-open [f (io.open "easylist_min_content_blocker.json" "r")]
-             (let [blocks (f:read "*a")]
-               (store:save "easylist"
-                           (lgi.GLib.Bytes blocks)
-                           nil
-                           (fn [self res]
-                             (cb (store:save_finish res)))))))
+    (let [blocks (f:read "*a")]
+      (store:save "easylist"
+                  (lgi.GLib.Bytes blocks)
+                  nil
+                  (fn [self res]
+                    (cb (store:save_finish res)))))))
 
 (fn load-adblocks [content-manager store]
   (store:fetch_identifiers
