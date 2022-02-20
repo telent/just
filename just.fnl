@@ -1,10 +1,8 @@
 (local lgi (require :lgi))
 (local inspect (require :inspect))
 
-(local Gtk lgi.Gtk)
-(local Gdk lgi.Gdk)
-(local WebKit2 lgi.WebKit2)
-(local cairo lgi.cairo)
+(local { : Gtk : Gdk : WebKit2 : cairo } lgi)
+
 
 (local cache-dir (.. (os.getenv "HOME") "/.cache/just"))
 
