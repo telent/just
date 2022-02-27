@@ -45,10 +45,19 @@
 
 (let [s (observable.new {:foo {:bar 43}})]
   (var win false)
-  ;; observers live on subtrees, not individual nodes
-  (s:observe [:foo] #(set win true))
+  ;; observer  on leaf
+  (s:observe [:foo :bar] #(set win true))
   (s:update [:foo :bar] 42)
   (expect (and win)))
+
+(let [s (observable.new {:foo {:bar 43}})]
+  (var win false)
+  ;; observer  on subtree
+  (s:observe [:foo] #(set win true))
+  (s:update [:foo :bar] 42)
+  (expect (and true win)))
+
+
 
 (let [s (observable.new {:foo {:bar {:baz 43}}})]
   (var win 0)
