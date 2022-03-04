@@ -17,27 +17,31 @@
        (.. cache-dir "/cookies.db")
        WebKit2.CookiePersistentStorage.SQLITE))
 
+(fn notify-listeners [listeners name value]
+  (let [funs (. listeners name)]
+    (when funs
+      (each [_ f (ipairs funs)]
+        (f value)))))
+
+(fn add-listener [listeners event-name fun]
+  (let [funs (or (. listeners event-name) [])]
+    (table.insert funs fun)
+    (tset listeners event-name funs)))
+
 (local
  Webview
  {
   :new
   #(let [listeners {}
-         notify-listeners (fn [self pspec]
-                            (let [n pspec.name
-                                  funs (. listeners n)]
-                              (when funs
-                                (each [_ f (ipairs funs)]
-                                  (f (. self n))))))
          widget (WebKit2.WebView {
                                   :on_notify
-                                  #(notify-listeners $1 $2)
+                                  (fn [self pspec]
+                                    (when (not (= pspec.name :parent))
+                                            (notify-listeners listeners pspec.name (. self pspec.name))))
                                   })]
      ;;(load-adblocks webview.user_content_manager content-filter-store)
      {
-      :listen (fn [self event-name fun]
-                (let [funs (or (. listeners event-name) [])]
-                  (table.insert funs fun)
-                  (tset listeners event-name funs)))
+      :listen #(add-listener listeners $2 $3)
       :visit (fn [self url]
                (widget:load_uri url))
       :stop-loading #(widget:stop_loading)
