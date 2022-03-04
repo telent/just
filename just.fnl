@@ -17,31 +17,37 @@
        (.. cache-dir "/cookies.db")
        WebKit2.CookiePersistentStorage.SQLITE))
 
-(fn notify-listeners [listeners name value]
-  (let [funs (. listeners name)]
-    (when funs
-      (each [_ f (ipairs funs)]
-        (f value)))))
-
-(fn add-listener [listeners event-name fun]
-  (let [funs (or (. listeners event-name) [])]
-    (table.insert funs fun)
-    (tset listeners event-name funs)))
+(local
+ Listeners
+ {
+  :new
+  #(let [listeners {}]
+     {
+      :notify (fn [_ name value]
+                (let [funs (. listeners name)]
+                  (when funs
+                    (each [_ f (ipairs funs)]
+                      (f value)))))
+      :add (fn [_ event-name fun]
+             (let [funs (or (. listeners event-name) [])]
+               (table.insert funs fun)
+               (tset listeners event-name funs)))
+      })})
 
 (local
  Webview
  {
   :new
-  #(let [listeners {}
+  #(let [listeners (Listeners.new)
          widget (WebKit2.WebView {
                                   :on_notify
                                   (fn [self pspec]
                                     (when (not (= pspec.name :parent))
-                                            (notify-listeners listeners pspec.name (. self pspec.name))))
+                                            (listeners:notify pspec.name (. self pspec.name))))
                                   })]
      ;;(load-adblocks webview.user_content_manager content-filter-store)
      {
-      :listen #(add-listener listeners $2 $3)
+      :listen #(listeners:add $2 $3)
       :visit (fn [self url]
                (widget:load_uri url))
       :stop-loading #(widget:stop_loading)
@@ -56,15 +62,14 @@
  Viewplex
  {
   :new
-  #(let [listeners {}
+  #(let [listeners (Listeners.new)
          widget (Gtk.Notebook {
                                :show_tabs false
                                ;;# :on_switch_page
                                })]
      (var foreground-view nil)
-     (print :viewplex widget)
      {
-      :listen #(add-listener listeners $2 $3)
+      :listen #(listeners:add $2 $3)
       :widget widget
       :add-view (fn [self webview]
                   (set foreground-view webview)
