@@ -74,6 +74,7 @@
       :add-view (fn [self webview]
                   (set foreground-view webview)
                   (webview.widget:show)
+                  (webview:listen :uri #(listeners:notify :uri $1))
                   (set widget.page
                        (widget:append_page webview.widget)))
       :visit #(and foreground-view (foreground-view:visit $2))
@@ -146,8 +147,8 @@
       container (Gtk.Box {
                           :orientation Gtk.Orientation.VERTICAL
                           })
-      viewplex (Viewplex.new)
       webview (Webview.new)
+      viewplex (Viewplex.new)
       navbar (Navbar.new viewplex)
       ]
 
@@ -157,7 +158,7 @@
 
   (window:add container)
 
-  (webview:visit "https://terse.telent.net/")
+  (viewplex:visit "https://terse.telent.net/")
   (window:show_all))
 
 (Gtk.main)
