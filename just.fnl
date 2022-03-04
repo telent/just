@@ -52,6 +52,36 @@
       })
   })
 
+(local
+ Viewplex
+ {
+  :new
+  #(let [listeners {}
+         widget (Gtk.Notebook {
+                               :show_tabs false
+                               ;;# :on_switch_page
+                               })]
+     (var foreground-view nil)
+     (print :viewplex widget)
+     {
+      :listen #(add-listener listeners $2 $3)
+      :widget widget
+      :add-view (fn [self webview]
+                  (set foreground-view webview)
+                  (webview.widget:show)
+                  (set widget.page
+                       (widget:append_page webview.widget)))
+      :visit #(and foreground-view (foreground-view:visit $2))
+      :stop-loading #(and foreground-view
+                          (foreground-view:stop-loading))
+      :refresh #(and foreground-view (foreground-view:refresh))
+      :go-back #(and foreground-view (foreground-view:go-back))
+      })
+  })
+
+
+
+
 (fn named-image [name size]
   (Gtk.Image.new_from_icon_name
    name
@@ -111,12 +141,14 @@
       container (Gtk.Box {
                           :orientation Gtk.Orientation.VERTICAL
                           })
+      viewplex (Viewplex.new)
       webview (Webview.new)
-      navbar (Navbar.new webview)
+      navbar (Navbar.new viewplex)
       ]
 
   (container:pack_start navbar.widget false false 0)
-  (container:pack_start webview.widget true true 0)
+  (container:pack_start viewplex.widget true true 0)
+  (viewplex:add-view webview)
 
   (window:add container)
 
