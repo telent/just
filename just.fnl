@@ -21,9 +21,6 @@
        (.. cache-dir "/cookies.db")
        WebKit2.CookiePersistentStorage.SQLITE))
 
-
-
-
 (fn named-image [name size]
   (Gtk.Image.new_from_icon_name
    name
