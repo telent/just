@@ -5,6 +5,10 @@
 
 (local {: view} (require :fennel))
 
+(local Listeners (require :listeners))
+(local Webview (require :webview))
+(local Viewplex (require :viewplex))
+
 (local cache-dir (.. (os.getenv "HOME") "/.cache/just"))
 
 (local content-filter-store
@@ -16,85 +20,6 @@
     (: :set_persistent_storage
        (.. cache-dir "/cookies.db")
        WebKit2.CookiePersistentStorage.SQLITE))
-
-(local
- Listeners
- {
-  :new
-  #(let [listeners {}]
-     {
-      :notify (fn [_ name value]
-                (let [funs (. listeners name)]
-                  (when funs
-                    (each [_ f (ipairs funs)]
-                      (f value)))))
-      :add (fn [_ event-name fun]
-             (let [funs (or (. listeners event-name) [])]
-               (table.insert funs fun)
-               (tset listeners event-name funs)))
-      })})
-
-(local
- Webview
- {
-  :new
-  #(let [listeners (Listeners.new)
-         widget (WebKit2.WebView {
-                                  :on_notify
-                                  (fn [self pspec]
-                                    (when (not (= pspec.name :parent))
-                                            (listeners:notify pspec.name (. self pspec.name))))
-                                  })]
-     ;;(load-adblocks webview.user_content_manager content-filter-store)
-     {
-      :listen #(listeners:add $2 $3)
-      :visit (fn [self url]
-               (widget:load_uri url))
-      :stop-loading #(widget:stop_loading)
-      :refresh #(widget:reload)
-      :go-back #(and (widget:can_go_back) (widget:go_back))
-
-      :widget widget
-      })
-  })
-
-(local
- Viewplex
- (let [relay-events []]
-   {
-    :new
-    #(let [listeners (Listeners.new)
-           widget (Gtk.Notebook {
-                                 :show_tabs false
-                                 ;;# :on_switch_page
-                                 })
-           views []]
-       (var foreground-view nil)
-       {
-        :listen (fn [_ name fun]
-                  (if (not (. relay-events name))
-                      (each [_ v (ipairs views)]
-                        (v:listen name #(listeners:notify name $1))))
-                  (table.insert relay-events name)
-                  (listeners:add name fun))
-        :widget widget
-        :add-view (fn [self webview]
-                    (set foreground-view webview)
-                    (webview.widget:show)
-                    (table.insert views webview)
-                    (each [_ event-name (ipairs relay-events)]
-                      (webview:listen event-name
-                                      #(listeners:notify event-name $1)))
-                    (set widget.page
-                         (widget:append_page webview.widget)))
-        :visit #(and foreground-view (foreground-view:visit $2))
-        :stop-loading #(and foreground-view
-                            (foreground-view:stop-loading))
-        :refresh #(and foreground-view (foreground-view:refresh))
-        :go-back #(and foreground-view (foreground-view:go-back))
-        }
-       )}))
-
 
 
 
