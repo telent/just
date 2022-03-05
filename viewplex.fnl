@@ -15,11 +15,14 @@
     {
      :listen (fn [_ name fun]
                (if (not (. relay-events name))
-                     (v:listen name #(listeners:notify name $1))))
                    (each [_ v (pairs views)]
+                     (v:listen name #(if (= v foreground-view)
+                                         (listeners:notify name $1)))))
                (table.insert relay-events name)
                (listeners:add name fun))
+
      :widget widget
+
      :add-view (fn [self webview]
                  (set foreground-view webview)
                  (webview.widget:show)
@@ -30,6 +33,14 @@
                    (tset views page webview)
                    (set widget.page page)
                    page))
+
+     :focus (fn [_ page]
+              (let [view (. views page)]
+                (set foreground-view view)
+                (each [_ prop (ipairs relay-events)]
+                  (listeners:notify :uri (. view.properties prop)))
+                (set widget.page page)))
+
      :visit #(and foreground-view (foreground-view:visit $2))
      :stop-loading #(and foreground-view
                          (foreground-view:stop-loading))
