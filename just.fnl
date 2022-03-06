@@ -46,7 +46,7 @@
                     (: :set_image (named-image "view-refresh")))
           show-tabs (Gtk.Button {
                                  :label "><"
-;                                 :on_clicked  #(views:show-tab-overview)
+                                 :on_clicked #(webview:show-pages)
                                  })
           back (doto
                    (Gtk.Button {
@@ -80,18 +80,22 @@
       container (Gtk.Box {
                           :orientation Gtk.Orientation.VERTICAL
                           })
-      webview (Webview.new)
       viewplex (Viewplex.new)
       navbar (Navbar.new viewplex)
       ]
 
   (container:pack_start navbar.widget false false 0)
   (container:pack_start viewplex.widget true true 0)
-  (viewplex:add-view webview)
+
+  (each [_ url (ipairs arg)]
+    (let [v (Webview.new)]
+      (v:visit url)
+      (viewplex:add-view v)))
 
   (window:add container)
 
-  (viewplex:visit "https://terse.telent.net/")
+;    (lgi.GLib.timeout_add_seconds 0 3 #(viewplex:focus one)))
+
   (window:show_all))
 
 (Gtk.main)
