@@ -73,7 +73,7 @@
                             :width thumbnail-width
                             :height thumbnail-height
                             :image-position Gtk.PositionType.TOP
-                            :on_clicked #(self:focus w)
+                            :on_clicked #(self:focus-view w)
                             })]
          (on-swipe b #(self:remove-view w))
          (webview-thumbnail-image w.widget #(b:set_image $1))
@@ -104,14 +104,18 @@
                                :show_tabs false
                                })
          overview (Gtk.ScrolledWindow)
-         overview-page (widget:append_page overview)
+         overview-page-num (widget:append_page overview)
+         relay-event (fn [source event-name]
+                       (source:listen
+                        event-name
+                        #(if (= source foreground-view)
+                             (listeners:notify event-name $1))))
          views {}]
      {
       :listen (fn [_ name fun]
                 (if (not (. relay-events name))
                     (each [_ v (pairs views)]
-                      (v:listen name #(if (= v foreground-view)
-                                          (listeners:notify name $1)))))
+                      (relay-event v name)))
                 (table.insert relay-events name)
                 (listeners:add name fun))
 
@@ -121,8 +125,7 @@
                   (set foreground-view webview)
                   (webview.widget:show)
                   (each [_ event-name (ipairs relay-events)]
-                    (webview:listen event-name
-                                    #(listeners:notify event-name $1)))
+                    (relay-event webview event-name))
                   (let [page (widget:append_page webview.widget)]
                     (tset views page webview)
                     (set widget.page page)
@@ -132,20 +135,20 @@
                      (let [page (widget:page_num view.widget)]
                        (tset views page nil)
                        (widget:remove_page page)
-                       (self:show-pages)
+                       (self:show-overview)
                        ))
 
-      :focus (fn [_ view]
-               (when view
-                 (set foreground-view view)
-                 (each [_ prop (ipairs relay-events)]
-                   (listeners:notify prop (. view.properties prop)))
-                 (set widget.page (widget:page_num view.widget))))
+      :focus-view (fn [_ view]
+                    (when view
+                      (set foreground-view view)
+                      (each [_ prop (ipairs relay-events)]
+                        (listeners:notify prop (. view.properties prop)))
+                      (set widget.page (widget:page_num view.widget))))
 
-      :show-pages (fn [self]
-                    (set foreground-view nil)
-                    (set widget.page overview-page)
-                    (refresh-overview self overview views))
+      :show-overview (fn [self]
+                       (set foreground-view nil)
+                       (set widget.page overview-page-num)
+                       (refresh-overview self overview views))
 
       :visit #(and foreground-view (foreground-view:visit $2))
       :stop-loading #(and foreground-view

@@ -44,10 +44,10 @@
                                      :on_clicked #(webview:refresh)
                                      })
                     (: :set_image (named-image "view-refresh")))
-          show-tabs (Gtk.Button {
-                                 :label "><"
-                                 :on_clicked #(webview:show-pages)
-                                 })
+          show-overview (Gtk.Button {
+                                     :label "><"
+                                     :on_clicked #(webview:show-overview)
+                                     })
           back (doto
                    (Gtk.Button {
                                 :on_clicked #(webview:go-back)
@@ -61,7 +61,7 @@
       (widget:pack_start refresh false false 2)
       (widget:pack_start stop false false 2)
       (widget:pack_start url  true true 2)
-      (widget:pack_end show-tabs false false 2)
+      (widget:pack_end show-overview false false 2)
 
       (webview:listen :uri #(url:set_text $1))
 
