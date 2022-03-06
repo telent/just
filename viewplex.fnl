@@ -5,35 +5,6 @@
 (local thumbnail-width 300)
 (local thumbnail-height 200)
 
-(fn scale-surface [source image-width image-height]
-  (let [scaled (cairo.ImageSurface.create
-                cairo.Format.ARGB32
-                image-width image-height)
-        ctx (cairo.Context.create scaled)
-        source-width (cairo.ImageSurface.get_width source)
-        source-height (cairo.ImageSurface.get_height source)
-        scale (/ image-width source-width)]
-    ;; XXX do we need to destroy this context? the example
-    ;; in C called cairo_destroy(cr), but I haven't found a
-    ;; gi equivalent
-    (doto ctx
-      (: :scale scale scale)
-      (: :set_source_surface source 0 0)
-      (: :paint))
-    scaled))
-
-(fn webview-thumbnail-image [webview-widget fun]
-  ;; underlying call is async, so use callback
-  (webview-widget:get_snapshot
-   WebKit2.SnapshotRegion.VISIBLE
-   WebKit2.SnapshotOptions.NONE
-   nil
-   (fn [self res]
-     (let [surface (webview-widget:get_snapshot_finish res)
-           scaled (scale-surface surface thumbnail-width thumbnail-height)
-           img (doto (Gtk.Image) (: :set_from_surface scaled))]
-       (fun img)))))
-
 (fn on-fake-swipe [widget fun]
   ;; this is here for testing on desktop systems that don't
   ;; have touch support
@@ -76,7 +47,7 @@
                             :on_clicked #(self:focus-view w)
                             })]
          (on-swipe b #(self:remove-view w))
-         (webview-thumbnail-image w.widget #(b:set_image $1))
+         (w:thumbnail-image thumbnail-width thumbnail-height #(b:set_image $1))
          b)
        false false 5))
 
