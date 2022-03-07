@@ -11,3 +11,8 @@ Touchscreen-friendly wrapper around Webkit
 - warning for insecure sites
 - try video and audio
 - does it save passwords? find out! where?
+
+---
+
+to reinstate
+- loading progress bar
