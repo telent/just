@@ -84,6 +84,8 @@
       navbar (Navbar.new viewplex)
       ]
 
+  (viewplex:listen :title #(window:set_title (..  $1 " - Just browsing")))
+
   (container:pack_start navbar.widget false false 0)
   (container:pack_start viewplex.widget true true 0)
 
@@ -93,9 +95,6 @@
       (viewplex:add-view v)))
 
   (window:add container)
-
-;    (lgi.GLib.timeout_add_seconds 0 3 #(viewplex:focus one)))
-
   (window:show_all))
 
 (Gtk.main)
