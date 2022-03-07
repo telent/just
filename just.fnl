@@ -78,7 +78,10 @@ progress, trough {
       (widget:pack_end show-overview false false 2)
 
       (webview:listen :uri #(url:set_text $1))
-
+      (webview:listen :estimated-load-progress
+                      (fn [fraction]
+                        (tset stop :visible (< fraction 1))
+                        (tset refresh :visible (>= fraction 1))))
       {
        :widget widget
        }))
