@@ -21,6 +21,20 @@
        (.. cache-dir "/cookies.db")
        WebKit2.CookiePersistentStorage.SQLITE))
 
+(let [css "
+progress, trough {
+  max-height: 6px;
+  color: #ff44bb;
+}
+"
+      style_provider (Gtk.CssProvider)]
+  (style_provider:load_from_data css)
+  (Gtk.StyleContext.add_provider_for_screen
+   (Gdk.Screen.get_default)
+   style_provider
+   Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+   ))
+
 (fn named-image [name size]
   (Gtk.Image.new_from_icon_name
    name
@@ -82,11 +96,18 @@
                           })
       viewplex (Viewplex.new)
       navbar (Navbar.new viewplex)
+      progress-bar (Gtk.ProgressBar {
+                                     :orientation Gtk.Orientation.HORIZONTAL
+                                     :fraction 1.0
+                                         :margin 0
+                                     })
       ]
 
   (viewplex:listen :title #(window:set_title (..  $1 " - Just browsing")))
+  (viewplex:listen :estimated-load-progress #(tset progress-bar :fraction $1))
 
   (container:pack_start navbar.widget false false 0)
+  (container:pack_start progress-bar false false 0)
   (container:pack_start viewplex.widget true true 0)
 
   (each [_ url (ipairs arg)]
