@@ -40,6 +40,30 @@ progress, trough {
    name
    (or size Gtk.IconSize.LARGE_TOOLBAR)))
 
+(fn urlencode [url]
+  (-> url
+      (: :gsub "([^%w ])" (fn [c] (string.format "%%%02X" (string.byte c))))
+      (: :gsub " " "+")))
+
+(print (urlencode "hello world o'hare & feirneds"))
+
+(local default-search-provider "ddg")
+
+(fn search-term-to-uri [provider text]
+  (match provider
+    "ebay"  (.. "https://www.ebay.co.uk/sch/i.html?_nkw=" (urlencode text))
+    "lua" (.. "https://pgl.yoyo.org/luai/i/" (urlencode text))
+    "ddg" (.. "https://duckduckgo.com/?q=" (urlencode text))))
+
+(fn to-uri [text]
+  (if (text:find " ")
+      (let [(_ _ provider term)  (text:find "^@(%g+) *(.*)")]
+        (if provider
+            (search-term-to-uri provider term)
+            (search-term-to-uri default-search-provider text)))
+      (text:find "^http") text
+      (.. "https://" text)))
+
 (local
  Navbar
  {
@@ -48,7 +72,7 @@ progress, trough {
     (let [url (Gtk.Entry {
                           ;; :completion (Gtk.EntryCompletion {:model completions :text_column 0 })
                           :on_activate
-                          #(webview:visit $1.text)
+                          #(webview:visit (to-uri $1.text))
                           })
           stop (doto (Gtk.Button {
                                   :on_clicked #(webview:stop-loading)
