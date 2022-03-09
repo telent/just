@@ -137,10 +137,13 @@ progress, trough {
   (container:pack_start progress-bar false false 0)
   (container:pack_start viewplex.widget true true 0)
 
-  (each [_ url (ipairs arg)]
-    (let [v (Webview.new)]
-      (v:visit url)
-      (viewplex:add-view v)))
+  (if (. arg 1)
+      (each [_ url (ipairs arg)]
+        (let [v (Webview.new)]
+          (v:visit url)
+          (viewplex:add-view v)))
+      (viewplex:add-view
+       (doto (Webview.new) (: :visit "about:blank"))))
 
   (window:add container)
   (window:show_all))
