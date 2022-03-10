@@ -99,6 +99,7 @@
                     (relay-event webview event-name))
                   (let [page (widget:append_page webview.widget)]
                     (tset views page webview)
+                    (tset self :properties webview.properties)
                     (set widget.page page)
                     page))
 
@@ -109,11 +110,12 @@
                        (self:show-overview)
                        ))
 
-      :focus-view (fn [_ view]
+      :focus-view (fn [self view]
                     (when view
                       (set foreground-view view)
                       (each [_ prop (ipairs relay-events)]
                         (listeners:notify prop (. view.properties prop)))
+                      (tset self :properties view.properties)
                       (set widget.page (widget:page_num view.widget))))
 
       :show-overview (fn [self]

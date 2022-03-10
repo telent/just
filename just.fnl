@@ -64,6 +64,10 @@ progress, trough {
       (text:find "^http") text
       (.. "https://" text)))
 
+(local keysyms {
+                :Escape 0xff1b
+                })
+
 (local
  Navbar
  {
@@ -73,6 +77,9 @@ progress, trough {
                           ;; :completion (Gtk.EntryCompletion {:model completions :text_column 0 })
                           :on_activate
                           #(webview:visit (to-uri $1.text))
+                          :on_key_release_event
+                          #(if (= $2.keyval keysyms.Escape)
+                               (tset $1 :text webview.properties.uri))
                           })
           stop (doto (Gtk.Button {
                                   :on_clicked #(webview:stop-loading)
