@@ -144,7 +144,8 @@ progress, trough {
                                      })
       ]
 
-  (viewplex:listen :title #(window:set_title (..  $1 " - Just browsing")))
+  (viewplex:listen :title #(window:set_title
+                            (..  (or $1 "") " - Just browsing")))
   (viewplex:listen :estimated-load-progress #(tset progress-bar :fraction $1))
 
   (container:pack_start navbar.widget false false 0)

@@ -1,4 +1,5 @@
 (local { : Gtk : Gdk : WebKit2 : cairo } (require :lgi))
+(local Webview (require :webview))
 
 (local Listeners (require :listeners))
 
@@ -56,7 +57,10 @@
                       :label " + "
                       :width 300
                       :height 200
-                      ; :on_clicked #(bus:publish $1 :new-tab)
+                      :on_clicked (fn []
+                                    (self:add-view
+                                     (doto (Webview.new)
+                                       (: :visit "about:blank"))))
                       })
                     false false 5)
 
@@ -93,14 +97,12 @@
       :widget widget
 
       :add-view (fn [self webview]
-                  (set foreground-view webview)
                   (webview.widget:show)
                   (each [_ event-name (ipairs relay-events)]
                     (relay-event webview event-name))
                   (let [page (widget:append_page webview.widget)]
                     (tset views page webview)
-                    (tset self :properties webview.properties)
-                    (set widget.page page)
+                    (self:focus-view webview)
                     page))
 
       :remove-view (fn [self view]

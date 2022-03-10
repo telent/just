@@ -11,4 +11,3 @@ Touchscreen-friendly wrapper around Webkit
 - try video and audio
 - does it save passwords? find out! where?
 - better icon for overview button
-- add new tab
