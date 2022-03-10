@@ -64,6 +64,13 @@ progress, trough {
       (text:find "^http") text
       (.. "https://" text)))
 
+(local completions
+       (doto (Gtk.ListStore)
+         (: :set_column_types [lgi.GObject.Type.STRING])))
+
+(fn add-autocomplete-suggestion [url]
+  (completions:append [url]))
+
 (local keysyms {
                 :Escape 0xff1b
                 })
@@ -74,9 +81,11 @@ progress, trough {
   :new
   (fn [webview]
     (let [url (Gtk.Entry {
-                          ;; :completion (Gtk.EntryCompletion {:model completions :text_column 0 })
+                          :completion (Gtk.EntryCompletion {:model completions :text_column 0 })
                           :on_activate
-                          #(webview:visit (to-uri $1.text))
+                          (fn [event]
+                            (add-autocomplete-suggestion event.text)
+                            (webview:visit (to-uri event.text)))
                           :on_key_release_event
                           #(if (= $2.keyval keysyms.Escape)
                                (tset $1 :text webview.properties.uri))
