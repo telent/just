@@ -45,8 +45,6 @@ progress, trough {
       (: :gsub "([^%w ])" (fn [c] (string.format "%%%02X" (string.byte c))))
       (: :gsub " " "+")))
 
-(print (urlencode "hello world o'hare & feirneds"))
-
 (local default-search-provider "ddg")
 
 (fn search-term-to-uri [provider text]
