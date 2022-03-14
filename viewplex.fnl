@@ -59,7 +59,8 @@
                       :height 200
                       :on_clicked (fn []
                                     (self:add-view
-                                     (doto (Webview.new)
+                                     (doto (Webview.new
+                                            {:content-filter-store self.content-filter-store})
                                        (: :visit "about:blank"))))
                       })
                     false false 5)
@@ -71,7 +72,7 @@
 
 {
  :new
- (fn []
+ (fn [{: content-filter-store}]
    (var foreground-view nil)
    (let [listeners (Listeners.new)
          relay-events []
@@ -87,6 +88,7 @@
                              (listeners:notify event-name $1))))
          views {}]
      {
+      :content-filter-store content-filter-store
       :listen (fn [_ name fun]
                 (if (not (. relay-events name))
                     (each [_ v (pairs views)]

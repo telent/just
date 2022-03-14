@@ -135,7 +135,7 @@ progress, trough {
       container (Gtk.Box {
                           :orientation Gtk.Orientation.VERTICAL
                           })
-      viewplex (Viewplex.new)
+      viewplex (Viewplex.new {:content-filter-store content-filter-store})
       navbar (Navbar.new viewplex)
       progress-bar (Gtk.ProgressBar {
                                      :orientation Gtk.Orientation.HORIZONTAL
@@ -154,11 +154,12 @@ progress, trough {
 
   (if (. arg 1)
       (each [_ url (ipairs arg)]
-        (let [v (Webview.new)]
+        (let [v (Webview.new {:content-filter-store content-filter-store} )]
           (v:visit url)
           (viewplex:add-view v)))
       (viewplex:add-view
-       (doto (Webview.new) (: :visit "about:blank"))))
+       (doto (Webview.new {:content-filter-store content-filter-store})
+         (: :visit "about:blank"))))
 
   (window:add container)
   (window:show_all))

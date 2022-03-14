@@ -1,6 +1,32 @@
-(local { : Gtk : Gdk : WebKit2 : cairo } (require :lgi))
+(local { : Gtk : Gdk : WebKit2 : cairo  : GLib } (require :lgi))
 
 (local Listeners (require :listeners))
+
+(fn load-easylist-json [store cb]
+  (print "loading easylist from json")
+  (with-open [f (io.open "easylist_min_content_blocker.json" "r")]
+    (let [blocks (f:read "*a")]
+      (store:save "easylist"
+                  (GLib.Bytes blocks)
+                  nil
+                  (fn [self res]
+                    (cb (store:save_finish res)))))))
+
+(fn load-adblocks [content-manager store]
+  (store:fetch_identifiers
+   nil
+   (fn [self res]
+     (let [ids (store:fetch_identifiers_finish res)
+           found (icollect [_ id (pairs ids)] (= id "easylist"))]
+       (if (> (# found) 0)
+           (store:load "easylist" nil
+                       (fn [self res]
+                         (content-manager:add_filter
+                          (store:load_finish res))))
+           (load-easylist-json
+            store
+            (fn [filter]
+              (content-manager:add_filter filter))))))))
 
 (fn scale-surface [source image-width image-height]
   (let [scaled (cairo.ImageSurface.create
@@ -34,29 +60,31 @@
 
 {
  :new
- #(let [listeners (Listeners.new)
-        props {}
-        widget (WebKit2.WebView {
-                                 :on_notify
-                                 (fn [self pspec]
-                                   (when (not (= pspec.name :parent))
-                                     (let [val (. self pspec.name)]
-                                       (tset props pspec.name val)
-                                       (listeners:notify pspec.name val))))
-                                 })]
-    ;;(load-adblocks webview.user_content_manager content-filter-store)
-    {
-     :listen #(listeners:add $2 $3)
-     :visit (fn [self url]
-              (widget:load_uri url))
-     :stop-loading #(widget:stop_loading)
-     :refresh #(widget:reload)
-     :go-back #(and (widget:can_go_back) (widget:go_back))
+ (fn [{: content-filter-store}]
+   (let [listeners (Listeners.new)
+         props {}
+         widget (WebKit2.WebView {
+                                  :on_notify
+                                  (fn [self pspec]
+                                    (when (not (= pspec.name :parent))
+                                      (let [val (. self pspec.name)]
+                                        (tset props pspec.name val)
+                                        (listeners:notify pspec.name val))))
+                                  })]
+     (when content-filter-store
+       (load-adblocks widget.user_content_manager content-filter-store))
+     {
+      :listen #(listeners:add $2 $3)
+      :visit (fn [self url]
+               (widget:load_uri url))
+      :stop-loading #(widget:stop_loading)
+      :refresh #(widget:reload)
+      :go-back #(and (widget:can_go_back) (widget:go_back))
 
-     :thumbnail-image (fn [self width height fun]
-                        (thumbnail-image widget width height fun))
+      :thumbnail-image (fn [self width height fun]
+                         (thumbnail-image widget width height fun))
 
-     :properties props
-     :widget widget
-     })
+      :properties props
+      :widget widget
+      }))
  }
