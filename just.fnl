@@ -3,7 +3,8 @@
 
 (local { : Gtk : Gdk : WebKit2 : cairo } lgi)
 
-(local {: view} (require :fennel))
+(if (os.getenv "JUST_HACKING")
+    (local {: view} (require :fennel)))
 
 (local Listeners (require :listeners))
 (local Webview (require :webview))

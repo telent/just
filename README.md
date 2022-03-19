@@ -2,6 +2,22 @@
 
 Touchscreen-friendly wrapper around Webkit
 
+## Building
+
+If you have Nix
+
+    nix-build build.nix
+
+Otherwise, very approximately
+
+* find and install the Lua packages described by the lua5_3.withPackages form in `default.nix`
+* install [Fennel](https://fennel-lang.org/setup#downloading-fennel)
+* `make`
+
+This *should* result in an executable called `just`, but
+YMMV. Consider Nix?
+
+
 ## TO DO
 
 * functional
