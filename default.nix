@@ -41,5 +41,7 @@ in stdenv.mkDerivation {
   nativeBuildInputs = [ lua makeWrapper ];
 
   makeFlags = [ "PREFIX=${placeholder "out"}" ];
-
+  postInstall = ''
+    wrapProgram $out/bin/just  --set GI_TYPELIB_PATH "$GI_TYPELIB_PATH"
+  '';
 }
