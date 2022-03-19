@@ -1,10 +1,13 @@
 (local lgi (require :lgi))
 (local inspect (require :inspect))
 
-(local Gtk lgi.Gtk)
-(local Gdk lgi.Gdk)
-(local WebKit2 lgi.WebKit2)
-(local cairo lgi.cairo)
+(local { : Gtk : Gdk : WebKit2 : cairo } lgi)
+
+(local {: view} (require :fennel))
+
+(local Listeners (require :listeners))
+(local Webview (require :webview))
+(local Viewplex (require :viewplex))
 
 (local cache-dir (.. (os.getenv "HOME") "/.cache/just"))
 
@@ -18,229 +21,46 @@
        (.. cache-dir "/cookies.db")
        WebKit2.CookiePersistentStorage.SQLITE))
 
-(fn event-bus []
-  (let [subscriptions {}
-        vivify (fn [n v]
-                 (tset n v (or (. n v) []))
-                 (. n v))]
-    {
-     :subscribe (fn [self event-name handler]
-                  (table.insert (vivify subscriptions event-name) handler))
-     :publish (fn [self sender event-name payload]
-                (each [_ handler (pairs (. subscriptions event-name))]
-                  (handler sender payload)))
-     :unsubscribe (fn [self event-name handler]
-                    (table.remove (. subscriptions event-name) handler))
-     }))
-
+(let [css "
+progress, trough {
+  max-height: 6px;
+  color: #ff44bb;
+}
+"
+      style_provider (Gtk.CssProvider)]
+  (style_provider:load_from_data css)
+  (Gtk.StyleContext.add_provider_for_screen
+   (Gdk.Screen.get_default)
+   style_provider
+   Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+   ))
 
 (fn named-image [name size]
   (Gtk.Image.new_from_icon_name
    name
    (or size Gtk.IconSize.LARGE_TOOLBAR)))
 
-(fn load-easylist-json [store cb]
-  (print "loading easylist from json")
-  (with-open [f (io.open "easylist_min_content_blocker.json" "r")]
-             (let [blocks (f:read "*a")]
-               (store:save "easylist"
-                           (lgi.GLib.Bytes blocks)
-                           nil
-                           (fn [self res]
-                             (cb (store:save_finish res)))))))
+(fn urlencode [url]
+  (-> url
+      (: :gsub "([^%w ])" (fn [c] (string.format "%%%02X" (string.byte c))))
+      (: :gsub " " "+")))
 
-(fn load-adblocks [content-manager store]
-  (store:fetch_identifiers
-   nil
-   (fn [self res]
-     (let [ids (store:fetch_identifiers_finish res)
-           found (icollect [_ id (pairs ids)] (= id "easylist"))]
-       (if (> (# found) 0)
-           (store:load "easylist" nil
-                       (fn [self res]
-                         (content-manager:add_filter
-                          (store:load_finish res))))
-           (load-easylist-json
-            store
-            (fn [filter]
-              (content-manager:add_filter filter))))))))
+(local default-search-provider "ddg")
 
-(let [css "
-progress, trough {
-  max-height: 6px;
-  color: #4444bb;
-}
-"
-      style_provider (Gtk.CssProvider)]
-  (style_provider:load_from_data css)
-  (Gtk.StyleContext.add_provider_for_screen
-   (lgi.Gdk.Screen.get_default)
-   style_provider
-   Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-   ))
+(fn search-term-to-uri [provider text]
+  (match provider
+    "ebay"  (.. "https://www.ebay.co.uk/sch/i.html?_nkw=" (urlencode text))
+    "lua" (.. "https://pgl.yoyo.org/luai/i/" (urlencode text))
+    "ddg" (.. "https://duckduckgo.com/?q=" (urlencode text))))
 
-
-(fn handle-webview-properties [self pspec bus]
-  (match pspec.name
-    "uri"
-    (bus:publish self :url-changed self.uri)
-
-    "title"
-    (if (> (self.title:len) 0)
-        (bus:publish self :title-changed self.title))
-
-    "estimated-load-progress"
-    (bus:publish self :loading-progress self.estimated_load_progress)
-
-    "is-loading"
-    (bus:publish self  (if self.is_loading :start-loading :stop-loading))
-    ))
-
-(fn new-webview [bus]
-  (let [webview (WebKit2.WebView {
-                                  :on_notify
-                                  #(handle-webview-properties $1 $2 bus)
-                                  })]
-    (load-adblocks webview.user_content_manager content-filter-store)
-    webview))
-
-(fn scale-surface [source]
-  (let [image-width 300
-        image-height 200
-        scaled (cairo.ImageSurface.create
-                cairo.Format.ARGB32
-                image-width image-height)
-        ctx (cairo.Context.create scaled)
-        source-width (cairo.ImageSurface.get_width source)
-        source-height (cairo.ImageSurface.get_height source)
-        scale (/ image-width source-width)]
-    ;; XXX do we need to destroy this context? the example
-    ;; in C called cairo_destroy(cr), but I haven't found a
-    ;; gi equivalent
-    (doto ctx
-      (: :scale scale scale)
-      (: :set_source_surface source 0 0)
-      (: :paint))
-    scaled))
-
-(fn load-webview-thumbnail [button webview]
-  (webview:get_snapshot
-   WebKit2.SnapshotRegion.VISIBLE
-   WebKit2.SnapshotOptions.NONE
-   nil
-   (fn [self res]
-     (let [surface (webview:get_snapshot_finish res)
-           scaled (scale-surface surface)
-           img (doto (Gtk.Image) (: :set_from_surface scaled))]
-       (button:set_image img)))))
-
-(fn connect-swipe-gesture [widget bus index]
-  (Gtk.GestureSwipe {
-                     :widget widget
-                     :on_update
-                     (fn [self]
-                       (self:set_state Gtk.EventSequenceState.CLAIMED))
-                     :on_swipe
-                     (fn [self x y]
-                       (if (and (< 700 x) (< y 700))
-                           (bus:publish self :close-tab index)
-                           (self:set_state Gtk.EventSequenceState.DENIED))
-                       true)
-                     }))
-
-
-(fn update-tab-overview [bus tabs scrolledwindow]
-  (let [box (Gtk.Box {
-                      :orientation Gtk.Orientation.VERTICAL
-                      })]
-
-    (each [_ w (ipairs (scrolledwindow:get_children))]
-      (scrolledwindow:remove w))
-
-    (box:add (Gtk.Label { :label "Open tabs" }))
-
-    (each [i w (pairs tabs)]
-      (when (> i 0)
-        (box:pack_start
-         (doto (Gtk.Button {
-                            :image-position Gtk.PositionType.TOP
-                            :on_clicked
-                            #(bus:publish $1 :switch-tab i)
-                            })
-           (connect-swipe-gesture bus i)
-           (load-webview-thumbnail w))
-         false false 5)))
-
-    (box:pack_start (Gtk.Button
-                     {
-                      :label " + "
-                      :width 300
-                      :height 200
-                      :on_clicked #(bus:publish $1 :new-tab)
-                      })
-                    false false 5)
-
-    (scrolledwindow:add box)
-    (scrolledwindow:show_all)
-    ))
-
-
-(fn pane-cave [bus]
-  (let [tabs {}
-        widget (Gtk.Notebook {
-                              :show_tabs false
-                              :on_switch_page
-                              (fn [self page num]
-                                (when (= num 0)
-                                  (update-tab-overview bus tabs page)))
-                              })
-        add-page (fn [v]
-                   (let [i (widget:append_page v)]
-                    (tset tabs i v)
-                    (v:show)
-                    (set widget.page i)
-                    v))
-        new-tab (fn [self]
-                  (let [v (add-page (new-webview bus))]
-                    (v:load_uri "about:blank")
-                    v))
-        tab-overview (Gtk.ScrolledWindow)
-        current #(. tabs widget.page)]
-    (bus:subscribe :fetch  #(match (current) c (c:load_uri $2)))
-    (bus:subscribe :stop-loading
-                   #(match (current) c (c:stop_loading)))
-    (bus:subscribe :reload
-                   #(match (current) c (c:reload)))
-    (bus:subscribe :go-back
-                   #(match (current) c (and (c:can_go_back) (c:go_back))))
-
-    (bus:subscribe :new-tab new-tab)
-    (bus:subscribe :switch-tab
-                   (fn [sender index]
-                     (widget:set_current_page index)
-                     (let [tab (. tabs index)]
-                       (when (and tab tab.uri tab.title)
-                         (bus:publish tab :url-changed tab.uri)
-                         (bus:publish tab :title-changed tab.title)
-                         ))))
-
-    (bus:subscribe :close-tab
-                   (fn [sender i]
-                     (tset tabs i nil)
-                     (update-tab-overview bus tabs tab-overview)
-                     (widget:set_current_page 0)))
-    (add-page tab-overview)
-
-    {
-     :new-tab new-tab
-     :current-tab current
-     :widget widget
-     :show-tab-overview (fn []
-                          (widget:set_current_page 0)
-                          (bus:publish tab-overview :url-changed false)
-                          (bus:publish tab-overview :title-changed "Open tabs"))
-
-     }))
+(fn to-uri [text]
+  (if (text:find " ")
+      (let [(_ _ provider term)  (text:find "^@(%g+) *(.*)")]
+        (if provider
+            (search-term-to-uri provider term)
+            (search-term-to-uri default-search-provider text)))
+      (text:find "^http") text
+      (.. "https://" text)))
 
 (local completions
        (doto (Gtk.ListStore)
@@ -249,8 +69,64 @@ progress, trough {
 (fn add-autocomplete-suggestion [url]
   (completions:append [url]))
 
-(let [bus (event-bus)
-      window (Gtk.Window {
+(local keysyms {
+                :Escape 0xff1b
+                })
+
+(local
+ Navbar
+ {
+  :new
+  (fn [webview]
+    (let [url (Gtk.Entry {
+                          :completion (Gtk.EntryCompletion {:model completions :text_column 0 })
+                          :on_activate
+                          (fn [event]
+                            (add-autocomplete-suggestion event.text)
+                            (webview:visit (to-uri event.text)))
+                          :on_key_release_event
+                          #(if (= $2.keyval keysyms.Escape)
+                               (tset $1 :text webview.properties.uri))
+                          })
+          stop (doto (Gtk.Button {
+                                  :on_clicked #(webview:stop-loading)
+                                  })
+                 (: :set_image (named-image "process-stop")))
+          refresh (doto (Gtk.Button {
+                                     :on_clicked #(webview:refresh)
+                                     })
+                    (: :set_image (named-image "view-refresh")))
+          show-overview (Gtk.Button {
+                                     :label "><"
+                                     :on_clicked #(webview:show-overview)
+                                     })
+          back (doto
+                   (Gtk.Button {
+                                :on_clicked #(webview:go-back)
+                                })
+                 (: :set_image (named-image "go-previous")))
+          widget (Gtk.Box {
+                           :orientation Gtk.Orientation.HORIZONTAL
+                           })
+          ]
+      (widget:pack_start back false false 2)
+      (widget:pack_start refresh false false 2)
+      (widget:pack_start stop false false 2)
+      (widget:pack_start url  true true 2)
+      (widget:pack_end show-overview false false 2)
+
+      (webview:listen :uri #(url:set_text $1))
+      (webview:listen :estimated-load-progress
+                      (fn [fraction]
+                        (tset stop :visible (< fraction 1))
+                        (tset refresh :visible (>= fraction 1))))
+      {
+       :widget widget
+       }))
+  })
+
+
+(let [window (Gtk.Window {
                           :title "Just browsing"
                           :default_width 360
                           :default_height 720
@@ -259,87 +135,33 @@ progress, trough {
       container (Gtk.Box {
                           :orientation Gtk.Orientation.VERTICAL
                           })
-      nav-bar (Gtk.Box {
-                        :orientation Gtk.Orientation.HORIZONTAL
-                        })
+      viewplex (Viewplex.new {:content-filter-store content-filter-store})
+      navbar (Navbar.new viewplex)
       progress-bar (Gtk.ProgressBar {
                                      :orientation Gtk.Orientation.HORIZONTAL
                                      :fraction 1.0
-                                     :margin 0
+                                         :margin 0
                                      })
-      url (Gtk.Entry {
-                      :completion (Gtk.EntryCompletion {:model completions :text_column 0 })
-                      :on_activate
-                      (fn [self] (bus:publish self :fetch self.text))
-                      })
-      stop (doto (Gtk.Button {
-                             :on_clicked #(bus:publish $1 :stop-loading)
-                             })
-                (: :set_image (named-image "process-stop")))
-      refresh (doto (Gtk.Button {
-                                 :on_clicked #(bus:publish $1 :reload)
-                                 })
-                (: :set_image (named-image "view-refresh")))
-      views (pane-cave bus)
-      show-tabs (Gtk.Button {
-                            :label "><"
-                            :on_clicked  #(views:show-tab-overview)
-                            })
-      back (doto
-               (Gtk.Button {
-                            :on_clicked #(bus:publish $1 :go-back)
-                            })
-             (: :set_image (named-image "go-previous")))
-      visible? (fn [tab]
-                 (= (views:current-tab) tab))]
+      ]
 
-  (bus:subscribe :url-changed
-                 #(when (visible? $1)
-                    (doto url
-                      (: :set_text (or $2 ""))
-                      (: :set_editable (and $2 true)))))
+  (viewplex:listen :title #(window:set_title
+                            (..  (or $1 "") " - Just browsing")))
+  (viewplex:listen :estimated-load-progress #(tset progress-bar :fraction $1))
 
-  (bus:subscribe :title-changed
-                 #(when (visible? $1)
-                    (window:set_title
-                     (.. $2 " - Just browsing"))))
-
-  (bus:subscribe :loading-progress
-                 #(when (visible? $1)
-                    (tset progress-bar :fraction $2)))
-  (bus:subscribe :start-loading
-                 #(when (visible? $1)
-                    (stop:show) (refresh:hide)))
-  (bus:subscribe :stop-loading
-                 #(when (visible? $1)
-                    (stop:hide) (refresh:show)))
-
-  (each [_ url (ipairs arg)]
-    (views:new-tab))
-
-  (nav-bar:pack_start back false false 2)
-  (nav-bar:pack_start refresh false false 2)
-  (nav-bar:pack_start stop false false 2)
-  (nav-bar:pack_start url  true true 2)
-  (nav-bar:pack_end show-tabs false false 2)
-
-  (container:pack_start nav-bar false false 5)
+  (container:pack_start navbar.widget false false 0)
   (container:pack_start progress-bar false false 0)
-  (container:pack_start views.widget true true 5)
+  (container:pack_start viewplex.widget true true 0)
+
+  (if (. arg 1)
+      (each [_ url (ipairs arg)]
+        (let [v (Webview.new {:content-filter-store content-filter-store} )]
+          (v:visit url)
+          (viewplex:add-view v)))
+      (viewplex:add-view
+       (doto (Webview.new {:content-filter-store content-filter-store})
+         (: :visit "about:blank"))))
 
   (window:add container)
-
-  (window:show_all)
-
-  (bus:subscribe :fetch #(add-autocomplete-suggestion $2))
-
-  (each [i url (ipairs arg)]
-    (lgi.GLib.timeout_add_seconds
-     0
-     (* 2 i)
-     (fn []
-       (bus:publish window :switch-tab i)
-       (bus:publish window :fetch url)
-       false))))
+  (window:show_all))
 
 (Gtk.main)
