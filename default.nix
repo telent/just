@@ -30,14 +30,13 @@ let pname = "just";
       luaposix
       readline
     ]);
+    glib_networking_gio  = "${glib-networking}/lib/gio/modules";
 in stdenv.mkDerivation {
   inherit pname fennel;
   version = "0.1";
   src =./.;
 
-  # this will have to go into a makeWrapper thingy when we
-  # get to the point of producing an actual package
-  GIO_EXTRA_MODULES = "${glib-networking}/lib/gio/modules";
+  GIO_EXTRA_MODULES = glib_networking_gio;
 
   buildInputs = [ lua gtk3 webkitgtk gobject-introspection.dev
                   glib-networking  ];
@@ -57,6 +56,6 @@ in stdenv.mkDerivation {
   ];
 
   postInstall = ''
-    wrapProgram $out/bin/just  --set GI_TYPELIB_PATH "$GI_TYPELIB_PATH"
+    wrapProgram $out/bin/just --set GI_TYPELIB_PATH "$GI_TYPELIB_PATH" --prefix GIO_EXTRA_MODULES ":" "${glib_networking_gio}"
   '';
 }
