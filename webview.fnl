@@ -1,6 +1,10 @@
-(local { : Gtk : Gdk : WebKit2 : cairo  : GLib } (require :lgi))
+(local { : Gtk : Gdk : WebKit2 : cairo  : GLib : GObject } (require :lgi))
+(local posix (require :posix))
 
 (local Listeners (require :listeners))
+
+;; this is a hack, should find out what XDG says
+(local downloads-directory (.. (os.getenv "HOME") "/" "Downloads"))
 
 (fn load-easylist-json [store cb]
   (print "loading easylist from json")
@@ -57,6 +61,28 @@
            img (doto (Gtk.Image) (: :set_from_surface scaled))]
        (fun img)))))
 
+(fn basename [filename]
+  (string.match filename "[^/]+$"))
+
+(fn spawn-async [vec]
+  (let [pid (posix.unistd.fork)]
+    (if (> pid 0) true
+        (< pid 0) (assert (= "can't fork" nil))
+        (do
+          (for [f 3 255] (posix.unistd.close f))
+          (posix.execp "/usr/bin/env" vec)))))
+
+(fn download [uri headers]
+  (let [filename
+        (match (headers:get_content_disposition)
+          (disposition attrs) (basename attrs.filename)
+          _ (basename uri))]
+    (print :download uri  :to filename)
+    (spawn-async ["foot"
+                  "curl"
+                  uri
+                  "-o"
+                  (.. downloads-directory "/" filename)])))
 
 {
  :new
@@ -64,6 +90,16 @@
    (let [listeners (Listeners.new)
          props {}
          widget (WebKit2.WebView {
+                                  :on_decide_policy
+                                  (fn [self decision dtype]
+                                    (if (and
+                                         (WebKit2.ResponsePolicyDecision:is_type_of decision)
+                                         (not (decision:is_mime_type_supported)))
+                                        (do
+                                          (download decision.request.uri decision.response.http_headers)
+                                          (decision:ignore)
+                                          true)
+                                        false))
                                   :on_notify
                                   (fn [self pspec]
                                     (when (not (= pspec.name :parent))
