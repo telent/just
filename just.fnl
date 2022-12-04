@@ -10,6 +10,7 @@
 (local Listeners (require :listeners))
 (local Webview (require :webview))
 (local Viewplex (require :viewplex))
+(local srepl (require :socket-repl))
 
 (local cache-dir (.. (os.getenv "HOME") "/.cache/just"))
 
@@ -127,6 +128,10 @@ progress, trough {
        }))
   })
 
+(when (= (. arg 1) "--socket")
+  (table.remove arg 1)
+  (srepl.start (. arg 1))
+  (table.remove arg 1))
 
 (let [window (Gtk.Window {
                           :title "Just browsing"
