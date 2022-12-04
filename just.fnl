@@ -1,10 +1,11 @@
 (local lgi (require :lgi))
-(local inspect (require :inspect))
 
 (local { : Gtk : Gdk : WebKit2 : cairo } lgi)
 
-(if (os.getenv "JUST_HACKING")
-    (local {: view} (require :fennel)))
+(local view
+       (if (os.getenv "JUST_HACKING")
+           (. (require :fennel) :view)
+           #nil))
 
 (local Listeners (require :listeners))
 (local Webview (require :webview))
