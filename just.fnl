@@ -157,7 +157,7 @@ progress, trough {
   (if (. arg 1)
       (each [_ url (ipairs arg)]
         (let [v (Webview.new {:content-filter-store content-filter-store} )]
-          (v:visit url)
+          (v:visit (to-uri url))
           (viewplex:add-view v)))
       (viewplex:add-view
        (doto (Webview.new {:content-filter-store content-filter-store})
