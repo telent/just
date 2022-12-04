@@ -1,6 +1,7 @@
 { stdenv
 , callPackage
 , copyDesktopItems
+, fennel
 , fetchFromGitHub
 , fetchurl
 , glib-networking
@@ -13,16 +14,10 @@
 , lua5_3
 , makeDesktopItem
 , makeWrapper
+, webkitgtk
 , writeText
 }:
 let pname = "just";
-    fennel = fetchurl {
-      name = "fennel.lua";
-      url = "https://fennel-lang.org/downloads/fennel-1.0.0";
-      hash = "sha256:1nha32yilzagfwrs44hc763jgwxd700kaik1is7x7lsjjvkgapw7";
-    };
-    webkitgtk = gnome3.webkitgtk;
-
     lua = lua5_3.withPackages (ps: with ps; [
       inspect
       lgi
@@ -30,15 +25,19 @@ let pname = "just";
       luaposix
       readline
     ]);
+    fennel_ = fennel.override { inherit lua; };
     glib_networking_gio  = "${glib-networking}/lib/gio/modules";
-in stdenv.mkDerivation {
-  inherit pname fennel;
+in stdenv.mkDerivation rec {
+  inherit pname;
+  fennel = fennel_;
+
   version = "0.1";
   src =./.;
 
   GIO_EXTRA_MODULES = glib_networking_gio;
 
   buildInputs = [ lua gtk3 webkitgtk gobject-introspection.dev
+                  fennel
                   glib-networking  ];
   nativeBuildInputs = [ lua makeWrapper copyDesktopItems ];
 
@@ -49,13 +48,19 @@ in stdenv.mkDerivation {
       desktopName = "Just Browsing";
       name = pname;
       exec = pname;
-      categories = "Network;" ;
+      categories = ["Network"] ;
       icon = ./just.png;
       genericName = "Web browser";
     })
   ];
 
   postInstall = ''
-    wrapProgram $out/bin/just --set GI_TYPELIB_PATH "$GI_TYPELIB_PATH" --prefix GIO_EXTRA_MODULES ":" "${glib_networking_gio}"
+    makeWrapper ${fennel}/bin/fennel \
+      $out/bin/${pname} \
+      --set GI_TYPELIB_PATH "$GI_TYPELIB_PATH" \
+      --prefix GIO_EXTRA_MODULES ":" "${glib_networking_gio}" \
+      --add-flags "--add-fennel-path $out/lib/just/?.fnl" \
+      --add-flags "--add-package-path $out/lib/just/?.lua" \
+      --add-flags "$out/lib/just/just.fnl"
   '';
 }
