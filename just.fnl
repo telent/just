@@ -63,6 +63,7 @@ progress, trough {
             (search-term-to-uri provider term)
             (search-term-to-uri default-search-provider text)))
       (text:find "^http") text
+      (text:find "^file") text
       (.. "https://" text)))
 
 (local completions
