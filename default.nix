@@ -25,7 +25,7 @@ let pname = "just";
       luaposix
       readline
     ]);
-    fennel_ = fennel.override { inherit lua; };
+    fennel_ = lua.pkgs.fennel;
     glib_networking_gio  = "${glib-networking}/lib/gio/modules";
 in stdenv.mkDerivation rec {
   inherit pname;
@@ -36,10 +36,19 @@ in stdenv.mkDerivation rec {
 
   GIO_EXTRA_MODULES = glib_networking_gio;
 
-  buildInputs = [ lua gtk3 webkitgtk gobject-introspection.dev
-                  fennel
-                  glib-networking  ];
-  nativeBuildInputs = [ lua makeWrapper copyDesktopItems ];
+  buildInputs = [
+    lua
+    gtk3
+    webkitgtk
+    gobject-introspection.dev
+    fennel
+    glib-networking
+  ];
+  nativeBuildInputs = [
+    lua
+    makeWrapper
+    copyDesktopItems
+  ];
 
   makeFlags = [ "PREFIX=${placeholder "out"}" ];
 
